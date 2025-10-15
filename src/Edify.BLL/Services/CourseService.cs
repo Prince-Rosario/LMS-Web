@@ -203,6 +203,35 @@ public class CourseService : ICourseService
         
         return courses;
     }
+    
+    public async Task<IEnumerable<CourseResponseDto>> GetTeacherCoursesAsync(int teacherId)
+    {
+        var teacher = await _unitOfWork.Users.GetByIdAsync(teacherId);
+        
+        if (teacher == null || teacher.Role != UserRole.Teacher)
+        {
+            throw new UnauthorizedException("Only teachers can view their courses");
+        }
+        
+        var courses = await _unitOfWork.Courses.FindAsync(c => c.TeacherId == teacherId && c.IsActive);
+        
+        var courseDtos = new List<CourseResponseDto>();
+        foreach (var course in courses)
+        {
+            courseDtos.Add(new CourseResponseDto
+            {
+                Id = course.Id,
+                Title = course.Title,
+                Description = course.Description,
+                InvitationCode = course.InvitationCode,
+                TeacherName = $"{teacher.FirstName} {teacher.LastName}",
+                TeacherId = teacher.Id,
+                CreatedAt = course.CreatedAt
+            });
+        }
+        
+        return courseDtos;
+    }
 }
 
 

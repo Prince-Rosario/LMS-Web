@@ -36,7 +36,7 @@ public class EdifyDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.InvitationCode).IsUnique();
             entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.Description).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.InvitationCode).IsRequired().HasMaxLength(10);
             
             entity.HasOne(e => e.Teacher)

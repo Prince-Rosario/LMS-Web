@@ -9,6 +9,7 @@ public interface ICourseService
     Task<IEnumerable<EnrollmentRequestDto>> GetEnrollmentRequestsAsync(int teacherId, int courseId);
     Task ApproveEnrollmentAsync(int teacherId, ApproveEnrollmentDto approveDto);
     Task<IEnumerable<CourseResponseDto>> GetStudentCoursesAsync(int studentId);
+    Task<IEnumerable<CourseResponseDto>> GetTeacherCoursesAsync(int teacherId);
 }
 
 

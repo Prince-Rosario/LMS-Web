@@ -61,11 +61,27 @@ public class CoursesController : ControllerBase
     }
     
     [HttpGet("my-courses")]
-    [Authorize(Roles = "Student")]
+    [Authorize]
     public async Task<ActionResult<IEnumerable<CourseResponseDto>>> GetMyCourses()
     {
-        var studentId = GetUserId();
-        var courses = await _courseService.GetStudentCoursesAsync(studentId);
+        var userId = GetUserId();
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+        
+        IEnumerable<CourseResponseDto> courses;
+        
+        if (userRole == "Teacher")
+        {
+            courses = await _courseService.GetTeacherCoursesAsync(userId);
+        }
+        else if (userRole == "Student")
+        {
+            courses = await _courseService.GetStudentCoursesAsync(userId);
+        }
+        else
+        {
+            return Unauthorized(new { message = "Invalid user role" });
+        }
+        
         return Ok(courses);
     }
 }
