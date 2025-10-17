@@ -84,8 +84,7 @@ ecf/
 rcf/
 
 # Entity Framework Migrations
-**/Migrations/*.cs
-!**/Migrations/*_Initial.cs
+# Note: Migrations should be committed to source control
 
 # macOS
 .DS_Store

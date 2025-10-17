@@ -16,7 +16,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Edify API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "Edify API", 
+        Version = "v1",
+        Description = "Edify Learning Management System API"
+    });
+    
+    // Include XML comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    options.IncludeXmlComments(xmlPath);
     
     // Add JWT authentication to Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
