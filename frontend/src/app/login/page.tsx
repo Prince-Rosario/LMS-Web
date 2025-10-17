@@ -27,9 +27,11 @@ export default function LoginPage() {
       const responseData = await res.json();
       localStorage.setItem("token", responseData.token);
       localStorage.setItem("user", JSON.stringify(responseData));
+      window.dispatchEvent(new Event("authChanged"));
+      console.log("token:", responseData.token);
 
       alert("Login successful!");
-      router.push("/dashboard");
+      router.push("/");
     } catch (error) {
       console.error(error);
       alert("Invalid email or password");

@@ -14,7 +14,7 @@ type RegisterFormData = {
   email: string;
   password: string;
   role: UserRole; // 0 = student, 1 = teacher
-  groupClass: string;
+  groupClass?: string;
 };
 
 export default function RegisterPage() {
@@ -23,15 +23,21 @@ export default function RegisterPage() {
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<RegisterFormData>();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const selectedRole = watch("role"); // 👈 watch for role changes
+
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true);
     try {
-      // ✅ Ensure role is sent as a number
-      const payload = { ...data, role: Number(data.role) };
+      const payload = {
+        ...data,
+        role: Number(data.role),
+        groupClass: data.role === UserRole.Teacher ? "" : data.groupClass || "",
+      };
 
       console.log("Sending data:", payload);
 
@@ -51,9 +57,10 @@ export default function RegisterPage() {
 
       localStorage.setItem("token", responseData.token);
       localStorage.setItem("user", JSON.stringify(responseData));
+      window.dispatchEvent(new Event("authChanged"));
       alert("Registration successful!");
       reset();
-      router.push("/dashboard");
+      router.push("/");
     } catch (error) {
       console.error("Error:", error);
       alert("Something went wrong, please try again later.");
@@ -146,18 +153,23 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Group/Class</label>
-            <input
-              type="text"
-              {...register("groupClass")}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              placeholder="CSE-2025"
-            />
-            {errors.groupClass && (
-              <p className="text-red-500 text-sm mt-1">{errors.groupClass.message}</p>
-            )}
-          </div>
+          {/* ✅ Only show Group/Class if role is Student */}
+          {Number(selectedRole) === UserRole.Student && (
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">
+                Group/Class
+              </label>
+              <input
+                type="text"
+                {...register("groupClass")}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="CSE-2025"
+              />
+              {errors.groupClass && (
+                <p className="text-red-500 text-sm mt-1">{errors.groupClass.message}</p>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

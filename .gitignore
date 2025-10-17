@@ -111,3 +111,5 @@ LMS_Req.md
 PROJECT_SUMMARY.md
 SPRINT_PLAN.md
 TOKEN_BLACKLIST_IMPLEMENTATION.md
+
+src/Edify.API/appsettings.json
