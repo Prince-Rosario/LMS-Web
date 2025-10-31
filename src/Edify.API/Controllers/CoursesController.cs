@@ -120,11 +120,11 @@ public class CoursesController : ControllerBase
     }
     
     /// <summary>
-    /// Get all courses for the authenticated user (different results for Teachers and Students)
+    /// Get all courses for the authenticated user (supports multi-role users)
     /// </summary>
-    /// <returns>List of courses - created courses for teachers, enrolled courses for students</returns>
+    /// <returns>List of all courses - both created courses (if user can teach) and enrolled courses (if user can study)</returns>
     /// <response code="200">Returns the list of courses</response>
-    /// <response code="401">If user is not authenticated or has an invalid role</response>
+    /// <response code="401">If user is not authenticated</response>
     [HttpGet("my-courses")]
     [Authorize]
     [ProducesResponseType(typeof(IEnumerable<CourseResponseDto>), StatusCodes.Status200OK)]
@@ -132,24 +132,174 @@ public class CoursesController : ControllerBase
     public async Task<ActionResult<IEnumerable<CourseResponseDto>>> GetMyCourses()
     {
         var userId = GetUserId();
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-        
-        IEnumerable<CourseResponseDto> courses;
-        
-        if (userRole == "Teacher")
-        {
-            courses = await _courseService.GetTeacherCoursesAsync(userId);
-        }
-        else if (userRole == "Student")
-        {
-            courses = await _courseService.GetStudentCoursesAsync(userId);
-        }
-        else
-        {
-            return Unauthorized(new { message = "Invalid user role" });
-        }
-        
+        var courses = await _courseService.GetAllUserCoursesAsync(userId);
         return Ok(courses);
+    }
+    
+    // Admin endpoints
+    
+    /// <summary>
+    /// Get all pending course creation requests (Admin only)
+    /// </summary>
+    /// <remarks>
+    /// Returns all courses awaiting admin approval. Teachers create courses with "Pending" status,
+    /// and admins must review and approve/reject them before they become visible to students.
+    /// 
+    /// Sample request:
+    /// 
+    ///     GET /api/courses/admin/pending
+    ///     
+    /// </remarks>
+    /// <returns>List of courses with status "Pending"</returns>
+    /// <response code="200">Returns the list of pending courses</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not an admin</response>
+    [HttpGet("admin/pending")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(IEnumerable<CourseResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IEnumerable<CourseResponseDto>>> GetPendingCourses()
+    {
+        var adminId = GetUserId();
+        var courses = await _courseService.GetPendingCoursesAsync(adminId);
+        return Ok(courses);
+    }
+    
+    /// <summary>
+    /// Approve or reject a course creation request (Admin only)
+    /// </summary>
+    /// <remarks>
+    /// Allows admins to approve or reject pending course requests. 
+    /// When approved, the course becomes active and students can join.
+    /// When rejected, provide a rejection reason so the teacher knows why.
+    /// 
+    /// Sample request to approve:
+    /// 
+    ///     POST /api/courses/admin/approve
+    ///     {
+    ///         "courseId": 1,
+    ///         "approve": true,
+    ///         "rejectionReason": null
+    ///     }
+    ///     
+    /// Sample request to reject:
+    /// 
+    ///     POST /api/courses/admin/approve
+    ///     {
+    ///         "courseId": 1,
+    ///         "approve": false,
+    ///         "rejectionReason": "Course content is not appropriate"
+    ///     }
+    ///     
+    /// </remarks>
+    /// <param name="approveDto">Course approval details</param>
+    /// <returns>Success message</returns>
+    /// <response code="200">Course decision processed successfully</response>
+    /// <response code="400">If course is not in pending status or validation fails</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not an admin</response>
+    /// <response code="404">If course not found</response>
+    [HttpPost("admin/approve")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> ApproveCourse([FromBody] ApproveCourseDto approveDto)
+    {
+        var adminId = GetUserId();
+        await _courseService.ApproveCourseAsync(adminId, approveDto);
+        return Ok(new { message = "Course decision processed successfully" });
+    }
+    
+    /// <summary>
+    /// Get all courses regardless of status (Admin only)
+    /// </summary>
+    /// <remarks>
+    /// Returns all courses in the system: pending, approved, and rejected.
+    /// Useful for admin dashboard to see overview of all course requests and their statuses.
+    /// 
+    /// Sample request:
+    /// 
+    ///     GET /api/courses/admin/all
+    ///     
+    /// </remarks>
+    /// <returns>List of all courses with their current status</returns>
+    /// <response code="200">Returns the list of all courses</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not an admin</response>
+    [HttpGet("admin/all")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(IEnumerable<CourseResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IEnumerable<CourseResponseDto>>> GetAllCourses()
+    {
+        var adminId = GetUserId();
+        var courses = await _courseService.GetAllCoursesAsync(adminId);
+        return Ok(courses);
+    }
+    
+    /// <summary>
+    /// Delete a course completely (Admin only)
+    /// </summary>
+    /// <remarks>
+    /// Permanently deletes a course and all associated data including:
+    /// - All enrollments
+    /// - All materials
+    /// - All material progress records
+    /// 
+    /// This action cannot be undone. Use with caution.
+    /// 
+    /// Sample request:
+    /// 
+    ///     DELETE /api/courses/admin/1
+    ///     
+    /// </remarks>
+    /// <param name="courseId">The ID of the course to delete</param>
+    /// <returns>Success message</returns>
+    /// <response code="200">Course deleted successfully</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not an admin</response>
+    /// <response code="404">If course not found</response>
+    [HttpDelete("admin/{courseId}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> DeleteCourse(int courseId)
+    {
+        var adminId = GetUserId();
+        await _courseService.DeleteCourseAsync(adminId, courseId);
+        return Ok(new { message = "Course deleted successfully" });
+    }
+    
+    /// <summary>
+    /// Update course details (Teacher only)
+    /// </summary>
+    /// <param name="courseId">Course ID to update</param>
+    /// <param name="updateCourseDto">Updated course details</param>
+    /// <returns>Updated course details</returns>
+    /// <response code="200">Course updated successfully</response>
+    /// <response code="400">Validation error</response>
+    /// <response code="401">Not authenticated</response>
+    /// <response code="403">Not authorized (not the course owner)</response>
+    /// <response code="404">Course not found</response>
+    [HttpPut("{courseId}")]
+    [Authorize(Roles = "Teacher")]
+    [ProducesResponseType(typeof(CourseResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CourseResponseDto>> UpdateCourse(int courseId, [FromBody] UpdateCourseDto updateCourseDto)
+    {
+        var teacherId = GetUserId();
+        var course = await _courseService.UpdateCourseAsync(teacherId, courseId, updateCourseDto);
+        return Ok(course);
     }
 }
 

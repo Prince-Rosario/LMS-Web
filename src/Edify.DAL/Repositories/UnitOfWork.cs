@@ -11,6 +11,8 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<User> Users { get; }
     public IRepository<Course> Courses { get; }
     public IRepository<Enrollment> Enrollments { get; }
+    public IRepository<Material> Materials { get; }
+    public IRepository<MaterialProgress> MaterialProgress { get; }
     public IRepository<BlacklistedToken> BlacklistedTokens { get; }
     
     public UnitOfWork(EdifyDbContext context)
@@ -19,6 +21,8 @@ public class UnitOfWork : IUnitOfWork
         Users = new Repository<User>(context);
         Courses = new Repository<Course>(context);
         Enrollments = new Repository<Enrollment>(context);
+        Materials = new Repository<Material>(context);
+        MaterialProgress = new Repository<MaterialProgress>(context);
         BlacklistedTokens = new Repository<BlacklistedToken>(context);
     }
     

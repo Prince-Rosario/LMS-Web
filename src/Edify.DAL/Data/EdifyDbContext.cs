@@ -12,6 +12,8 @@ public class EdifyDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Course> Courses { get; set; }
     public DbSet<Enrollment> Enrollments { get; set; }
+    public DbSet<Material> Materials { get; set; }
+    public DbSet<MaterialProgress> MaterialProgress { get; set; }
     public DbSet<BlacklistedToken> BlacklistedTokens { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -38,10 +40,16 @@ public class EdifyDbContext : DbContext
             entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.InvitationCode).IsRequired().HasMaxLength(10);
+            entity.Property(e => e.RejectionReason).HasMaxLength(500);
             
             entity.HasOne(e => e.Teacher)
                 .WithMany(u => u.CreatedCourses)
                 .HasForeignKey(e => e.TeacherId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.ApprovedByAdmin)
+                .WithMany()
+                .HasForeignKey(e => e.ApprovedByAdminId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
         
@@ -59,6 +67,43 @@ public class EdifyDbContext : DbContext
             entity.HasOne(e => e.Course)
                 .WithMany(c => c.Enrollments)
                 .HasForeignKey(e => e.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // Material configuration
+        modelBuilder.Entity<Material>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.Topic).HasMaxLength(100);
+            
+            entity.HasOne(e => e.Course)
+                .WithMany(c => c.Materials)
+                .HasForeignKey(e => e.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.UploadedBy)
+                .WithMany(u => u.UploadedMaterials)
+                .HasForeignKey(e => e.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // MaterialProgress configuration
+        modelBuilder.Entity<MaterialProgress>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.MaterialId, e.StudentId }).IsUnique();
+            
+            entity.HasOne(e => e.Material)
+                .WithMany(m => m.MaterialProgress)
+                .HasForeignKey(e => e.MaterialId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Student)
+                .WithMany(u => u.MaterialProgress)
+                .HasForeignKey(e => e.StudentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
         

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Edify.BLL.Exceptions;
 using Edify.Core.DTOs.Auth;
 using Edify.Core.Entities;
+using Edify.Core.Enums;
 using Edify.Core.Interfaces;
 
 namespace Edify.BLL.Services;
@@ -20,6 +21,12 @@ public class AuthService : IAuthService
     
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
     {
+        // Block admin registration - admins are seeded only
+        if (registerDto.Role == UserRole.Admin)
+        {
+            throw new BadRequestException("Admin registration is not allowed. Please contact system administrator.");
+        }
+        
         // Check if user already exists
         var existingUser = await _unitOfWork.Users.GetAsync(u => u.Email == registerDto.Email);
         if (existingUser != null)
@@ -27,8 +34,18 @@ public class AuthService : IAuthService
             throw new BadRequestException("User with this email already exists");
         }
         
+        // Validate that user has at least one capability
+        if (!registerDto.CanTeach && !registerDto.CanStudy)
+        {
+            throw new BadRequestException("User must have at least one capability: CanTeach or CanStudy");
+        }
+        
         // Hash password
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+        
+        // Determine capabilities based on role or explicit flags
+        bool canTeach = registerDto.CanTeach || registerDto.Role == UserRole.Teacher;
+        bool canStudy = registerDto.CanStudy || registerDto.Role == UserRole.Student;
         
         // Create new user
         var user = new User
@@ -38,7 +55,9 @@ public class AuthService : IAuthService
             Email = registerDto.Email,
             PasswordHash = passwordHash,
             Role = registerDto.Role,
-            GroupClass = registerDto.GroupClass
+            GroupClass = registerDto.GroupClass,
+            CanTeach = canTeach,
+            CanStudy = canStudy
         };
         
         await _unitOfWork.Users.AddAsync(user);
@@ -54,6 +73,8 @@ public class AuthService : IAuthService
             LastName = user.LastName,
             Email = user.Email,
             Role = user.Role,
+            CanTeach = user.CanTeach,
+            CanStudy = user.CanStudy,
             GroupClass = user.GroupClass,
             Token = token
         };
@@ -89,6 +110,8 @@ public class AuthService : IAuthService
             LastName = user.LastName,
             Email = user.Email,
             Role = user.Role,
+            CanTeach = user.CanTeach,
+            CanStudy = user.CanStudy,
             GroupClass = user.GroupClass,
             Token = token
         };

@@ -10,6 +10,14 @@ public interface ICourseService
     Task ApproveEnrollmentAsync(int teacherId, ApproveEnrollmentDto approveDto);
     Task<IEnumerable<CourseResponseDto>> GetStudentCoursesAsync(int studentId);
     Task<IEnumerable<CourseResponseDto>> GetTeacherCoursesAsync(int teacherId);
+    Task<IEnumerable<CourseResponseDto>> GetAllUserCoursesAsync(int userId);
+    
+    // Admin methods
+    Task<IEnumerable<CourseResponseDto>> GetPendingCoursesAsync(int adminId);
+    Task ApproveCourseAsync(int adminId, ApproveCourseDto approveDto);
+    Task<IEnumerable<CourseResponseDto>> GetAllCoursesAsync(int adminId);
+    Task DeleteCourseAsync(int adminId, int courseId);
+    Task<CourseResponseDto> UpdateCourseAsync(int teacherId, int courseId, UpdateCourseDto updateCourseDto);
 }
 
 

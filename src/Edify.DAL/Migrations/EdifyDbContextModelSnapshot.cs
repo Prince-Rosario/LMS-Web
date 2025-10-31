@@ -71,6 +71,12 @@ namespace Edify.DAL.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ApprovedByAdminId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -86,6 +92,13 @@ namespace Edify.DAL.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<int>("TeacherId")
                         .HasColumnType("integer");
 
@@ -98,6 +111,8 @@ namespace Edify.DAL.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByAdminId");
 
                     b.HasIndex("InvitationCode")
                         .IsUnique();
@@ -143,6 +158,106 @@ namespace Edify.DAL.Migrations
                     b.ToTable("Enrollments");
                 });
 
+            modelBuilder.Entity("Edify.Core.Entities.Material", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .HasColumnType("text");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("FileDataBase64")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Topic")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("Materials");
+                });
+
+            modelBuilder.Entity("Edify.Core.Entities.MaterialProgress", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("MaterialId", "StudentId")
+                        .IsUnique();
+
+                    b.ToTable("MaterialProgress");
+                });
+
             modelBuilder.Entity("Edify.Core.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -150,6 +265,12 @@ namespace Edify.DAL.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("CanStudy")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CanTeach")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -207,11 +328,18 @@ namespace Edify.DAL.Migrations
 
             modelBuilder.Entity("Edify.Core.Entities.Course", b =>
                 {
+                    b.HasOne("Edify.Core.Entities.User", "ApprovedByAdmin")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAdminId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Edify.Core.Entities.User", "Teacher")
                         .WithMany("CreatedCourses")
                         .HasForeignKey("TeacherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ApprovedByAdmin");
 
                     b.Navigation("Teacher");
                 });
@@ -235,9 +363,54 @@ namespace Edify.DAL.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("Edify.Core.Entities.Material", b =>
+                {
+                    b.HasOne("Edify.Core.Entities.Course", "Course")
+                        .WithMany("Materials")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Edify.Core.Entities.User", "UploadedBy")
+                        .WithMany("UploadedMaterials")
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("UploadedBy");
+                });
+
+            modelBuilder.Entity("Edify.Core.Entities.MaterialProgress", b =>
+                {
+                    b.HasOne("Edify.Core.Entities.Material", "Material")
+                        .WithMany("MaterialProgress")
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Edify.Core.Entities.User", "Student")
+                        .WithMany("MaterialProgress")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("Edify.Core.Entities.Course", b =>
                 {
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Materials");
+                });
+
+            modelBuilder.Entity("Edify.Core.Entities.Material", b =>
+                {
+                    b.Navigation("MaterialProgress");
                 });
 
             modelBuilder.Entity("Edify.Core.Entities.User", b =>
@@ -245,6 +418,10 @@ namespace Edify.DAL.Migrations
                     b.Navigation("CreatedCourses");
 
                     b.Navigation("Enrollments");
+
+                    b.Navigation("MaterialProgress");
+
+                    b.Navigation("UploadedMaterials");
                 });
 #pragma warning restore 612, 618
         }

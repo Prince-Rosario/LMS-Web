@@ -20,12 +20,53 @@ public class AuthController : ControllerBase
     }
     
     /// <summary>
-    /// Register a new user account (Teacher or Student)
+    /// Register a new user account with flexible role capabilities (Student, Teacher, or both)
     /// </summary>
-    /// <param name="registerDto">Registration details including email, password, full name, and role</param>
+    /// <param name="registerDto">Registration details including email, password, full name, and role capabilities</param>
     /// <returns>Authentication response with JWT token and user information</returns>
     /// <response code="200">Returns the authentication token and user details</response>
-    /// <response code="400">If the registration data is invalid or email already exists</response>
+    /// <response code="400">If registration data is invalid, email exists, or user has no capabilities</response>
+    /// <remarks>
+    /// **Multi-Role Support:** Users can register with both teaching and studying capabilities.
+    /// 
+    /// Sample request (Student only):
+    /// 
+    ///     POST /api/Auth/register
+    ///     {
+    ///         "firstName": "John",
+    ///         "lastName": "Doe",
+    ///         "email": "john.doe@example.com",
+    ///         "password": "SecurePassword123!",
+    ///         "role": 0,
+    ///         "canTeach": false,
+    ///         "canStudy": true,
+    ///         "groupClass": "CS-2024-A"
+    ///     }
+    /// 
+    /// Sample request (PhD Student - teaches AND studies):
+    /// 
+    ///     POST /api/Auth/register
+    ///     {
+    ///         "firstName": "Jane",
+    ///         "lastName": "Smith",
+    ///         "email": "jane.smith@university.edu",
+    ///         "password": "SecurePassword123!",
+    ///         "role": 0,
+    ///         "canTeach": true,
+    ///         "canStudy": true,
+    ///         "groupClass": "PhD-2024"
+    ///     }
+    /// 
+    /// **Role values:** 0 = Student, 1 = Teacher, 2 = Admin
+    /// 
+    /// **Capability Rules:**
+    /// - Set `canTeach: true` to allow creating/managing courses
+    /// - Set `canStudy: true` to allow enrolling in courses
+    /// - Both can be true for dual-role users (PhD students, TAs, etc.)
+    /// - If `role = Teacher`, `canTeach` is automatically set to true
+    /// - If `role = Student`, `canStudy` is automatically set to true
+    /// - At least one capability required (unless Admin)
+    /// </remarks>
     [HttpPost("register")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

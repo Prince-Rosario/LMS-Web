@@ -21,9 +21,14 @@ public class CourseService : ICourseService
     {
         var teacher = await _unitOfWork.Users.GetByIdAsync(teacherId);
         
-        if (teacher == null || teacher.Role != UserRole.Teacher)
+        if (teacher == null)
         {
-            throw new UnauthorizedException("Only teachers can create courses");
+            throw new NotFoundException("User not found");
+        }
+        
+        if (!teacher.CanTeach)
+        {
+            throw new UnauthorizedException("Only users with teaching capability can create courses");
         }
         
         // Generate unique invitation code
@@ -52,7 +57,10 @@ public class CourseService : ICourseService
             InvitationCode = course.InvitationCode,
             TeacherName = $"{teacher.FirstName} {teacher.LastName}",
             TeacherId = teacher.Id,
-            CreatedAt = course.CreatedAt
+            Status = course.Status,
+            RejectionReason = course.RejectionReason,
+            CreatedAt = course.CreatedAt,
+            ApprovedAt = course.ApprovedAt
         };
     }
     
@@ -60,9 +68,14 @@ public class CourseService : ICourseService
     {
         var student = await _unitOfWork.Users.GetByIdAsync(studentId);
         
-        if (student == null || student.Role != UserRole.Student)
+        if (student == null)
         {
-            throw new UnauthorizedException("Only students can join courses");
+            throw new NotFoundException("User not found");
+        }
+        
+        if (!student.CanStudy)
+        {
+            throw new UnauthorizedException("Only users with study capability can join courses");
         }
         
         var course = await _unitOfWork.Courses.GetAsync(c => c.InvitationCode == joinCourseDto.InvitationCode);
@@ -70,6 +83,11 @@ public class CourseService : ICourseService
         if (course == null)
         {
             throw new NotFoundException("Course not found with this invitation code");
+        }
+        
+        if (course.Status != CourseStatus.Approved)
+        {
+            throw new BadRequestException("This course is not yet approved by admin");
         }
         
         // Check if already enrolled
@@ -173,9 +191,9 @@ public class CourseService : ICourseService
     {
         var student = await _unitOfWork.Users.GetByIdAsync(studentId);
         
-        if (student == null || student.Role != UserRole.Student)
+        if (student == null || !student.CanStudy)
         {
-            throw new UnauthorizedException("Only students can view enrolled courses");
+            throw new UnauthorizedException("Only users with study capability can view enrolled courses");
         }
         
         var enrollments = await _unitOfWork.Enrollments.FindAsync(
@@ -196,7 +214,10 @@ public class CourseService : ICourseService
                     InvitationCode = course.InvitationCode,
                     TeacherName = $"{teacher?.FirstName} {teacher?.LastName}",
                     TeacherId = course.TeacherId,
-                    CreatedAt = course.CreatedAt
+                    Status = course.Status,
+                    RejectionReason = course.RejectionReason,
+                    CreatedAt = course.CreatedAt,
+                    ApprovedAt = course.ApprovedAt
                 });
             }
         }
@@ -208,9 +229,9 @@ public class CourseService : ICourseService
     {
         var teacher = await _unitOfWork.Users.GetByIdAsync(teacherId);
         
-        if (teacher == null || teacher.Role != UserRole.Teacher)
+        if (teacher == null || !teacher.CanTeach)
         {
-            throw new UnauthorizedException("Only teachers can view their courses");
+            throw new UnauthorizedException("Only users with teaching capability can view their courses");
         }
         
         var courses = await _unitOfWork.Courses.FindAsync(c => c.TeacherId == teacherId && c.IsActive);
@@ -226,11 +247,276 @@ public class CourseService : ICourseService
                 InvitationCode = course.InvitationCode,
                 TeacherName = $"{teacher.FirstName} {teacher.LastName}",
                 TeacherId = teacher.Id,
-                CreatedAt = course.CreatedAt
+                Status = course.Status,
+                RejectionReason = course.RejectionReason,
+                CreatedAt = course.CreatedAt,
+                ApprovedAt = course.ApprovedAt
             });
         }
         
         return courseDtos;
+    }
+    
+    public async Task<IEnumerable<CourseResponseDto>> GetAllUserCoursesAsync(int userId)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        
+        if (user == null)
+        {
+            throw new NotFoundException("User not found");
+        }
+        
+        var courseDtos = new List<CourseResponseDto>();
+        
+        // Get courses where user is a teacher
+        if (user.CanTeach)
+        {
+            var teachingCourses = await _unitOfWork.Courses.FindAsync(c => c.TeacherId == userId && c.IsActive);
+            
+            foreach (var course in teachingCourses)
+            {
+                courseDtos.Add(new CourseResponseDto
+                {
+                    Id = course.Id,
+                    Title = course.Title,
+                    Description = course.Description,
+                    InvitationCode = course.InvitationCode,
+                    TeacherName = $"{user.FirstName} {user.LastName}",
+                    TeacherId = user.Id,
+                    Status = course.Status,
+                    RejectionReason = course.RejectionReason,
+                    CreatedAt = course.CreatedAt,
+                    ApprovedAt = course.ApprovedAt
+                });
+            }
+        }
+        
+        // Get courses where user is enrolled as a student
+        if (user.CanStudy)
+        {
+            var enrollments = await _unitOfWork.Enrollments.FindAsync(
+                e => e.StudentId == userId && e.Status == EnrollmentStatus.Approved);
+            
+            foreach (var enrollment in enrollments)
+            {
+                var course = await _unitOfWork.Courses.GetByIdAsync(enrollment.CourseId);
+                if (course != null && course.IsActive)
+                {
+                    var teacher = await _unitOfWork.Users.GetByIdAsync(course.TeacherId);
+                    courseDtos.Add(new CourseResponseDto
+                    {
+                        Id = course.Id,
+                        Title = course.Title,
+                        Description = course.Description,
+                        InvitationCode = course.InvitationCode,
+                        TeacherName = $"{teacher?.FirstName} {teacher?.LastName}",
+                        TeacherId = course.TeacherId,
+                        Status = course.Status,
+                        RejectionReason = course.RejectionReason,
+                        CreatedAt = course.CreatedAt,
+                        ApprovedAt = course.ApprovedAt
+                    });
+                }
+            }
+        }
+        
+        return courseDtos;
+    }
+    
+    public async Task<IEnumerable<CourseResponseDto>> GetPendingCoursesAsync(int adminId)
+    {
+        var admin = await _unitOfWork.Users.GetByIdAsync(adminId);
+        
+        if (admin == null || admin.Role != UserRole.Admin)
+        {
+            throw new UnauthorizedException("Only admins can view pending courses");
+        }
+        
+        var pendingCourses = await _unitOfWork.Courses.FindAsync(c => c.Status == CourseStatus.Pending);
+        
+        var courseDtos = new List<CourseResponseDto>();
+        foreach (var course in pendingCourses.OrderBy(c => c.CreatedAt))
+        {
+            var teacher = await _unitOfWork.Users.GetByIdAsync(course.TeacherId);
+            
+            courseDtos.Add(new CourseResponseDto
+            {
+                Id = course.Id,
+                Title = course.Title,
+                Description = course.Description,
+                InvitationCode = course.InvitationCode,
+                TeacherName = $"{teacher?.FirstName} {teacher?.LastName}",
+                TeacherId = course.TeacherId,
+                Status = course.Status,
+                RejectionReason = course.RejectionReason,
+                CreatedAt = course.CreatedAt,
+                ApprovedAt = course.ApprovedAt
+            });
+        }
+        
+        return courseDtos;
+    }
+    
+    public async Task ApproveCourseAsync(int adminId, ApproveCourseDto approveDto)
+    {
+        var admin = await _unitOfWork.Users.GetByIdAsync(adminId);
+        
+        if (admin == null || admin.Role != UserRole.Admin)
+        {
+            throw new UnauthorizedException("Only admins can approve courses");
+        }
+        
+        var course = await _unitOfWork.Courses.GetByIdAsync(approveDto.CourseId);
+        
+        if (course == null)
+        {
+            throw new NotFoundException("Course not found");
+        }
+        
+        if (course.Status != CourseStatus.Pending)
+        {
+            throw new BadRequestException("Only pending courses can be approved or rejected");
+        }
+        
+        if (approveDto.Approve)
+        {
+            course.Status = CourseStatus.Approved;
+            course.ApprovedByAdminId = adminId;
+            course.ApprovedAt = DateTime.UtcNow;
+            course.RejectionReason = null;
+        }
+        else
+        {
+            course.Status = CourseStatus.Rejected;
+            course.RejectionReason = approveDto.RejectionReason;
+            course.ApprovedByAdminId = adminId;
+        }
+        
+        await _unitOfWork.Courses.UpdateAsync(course);
+        await _unitOfWork.SaveChangesAsync();
+    }
+    
+    public async Task<IEnumerable<CourseResponseDto>> GetAllCoursesAsync(int adminId)
+    {
+        var admin = await _unitOfWork.Users.GetByIdAsync(adminId);
+        
+        if (admin == null || admin.Role != UserRole.Admin)
+        {
+            throw new UnauthorizedException("Only admins can view all courses");
+        }
+        
+        var allCourses = await _unitOfWork.Courses.GetAllAsync();
+        
+        var courseDtos = new List<CourseResponseDto>();
+        foreach (var course in allCourses.OrderByDescending(c => c.CreatedAt))
+        {
+            var teacher = await _unitOfWork.Users.GetByIdAsync(course.TeacherId);
+            
+            courseDtos.Add(new CourseResponseDto
+            {
+                Id = course.Id,
+                Title = course.Title,
+                Description = course.Description,
+                InvitationCode = course.InvitationCode,
+                TeacherName = $"{teacher?.FirstName} {teacher?.LastName}",
+                TeacherId = course.TeacherId,
+                Status = course.Status,
+                RejectionReason = course.RejectionReason,
+                CreatedAt = course.CreatedAt,
+                ApprovedAt = course.ApprovedAt
+            });
+        }
+        
+        return courseDtos;
+    }
+    
+    public async Task DeleteCourseAsync(int adminId, int courseId)
+    {
+        var admin = await _unitOfWork.Users.GetByIdAsync(adminId);
+        
+        if (admin == null || admin.Role != UserRole.Admin)
+        {
+            throw new UnauthorizedException("Only admins can delete courses");
+        }
+        
+        var course = await _unitOfWork.Courses.GetByIdAsync(courseId);
+        
+        if (course == null)
+        {
+            throw new NotFoundException("Course not found");
+        }
+        
+        // Delete associated enrollments
+        var enrollments = await _unitOfWork.Enrollments.FindAsync(e => e.CourseId == courseId);
+        foreach (var enrollment in enrollments)
+        {
+            await _unitOfWork.Enrollments.DeleteAsync(enrollment);
+        }
+        
+        // Delete associated materials and their progress
+        var materials = await _unitOfWork.Materials.FindAsync(m => m.CourseId == courseId);
+        foreach (var material in materials)
+        {
+            var materialProgress = await _unitOfWork.MaterialProgress.FindAsync(mp => mp.MaterialId == material.Id);
+            foreach (var progress in materialProgress)
+            {
+                await _unitOfWork.MaterialProgress.DeleteAsync(progress);
+            }
+            await _unitOfWork.Materials.DeleteAsync(material);
+        }
+        
+        // Finally, delete the course
+        await _unitOfWork.Courses.DeleteAsync(course);
+        await _unitOfWork.SaveChangesAsync();
+    }
+    
+    public async Task<CourseResponseDto> UpdateCourseAsync(int teacherId, int courseId, UpdateCourseDto updateCourseDto)
+    {
+        var teacher = await _unitOfWork.Users.GetByIdAsync(teacherId);
+        
+        if (teacher == null)
+        {
+            throw new NotFoundException("User not found");
+        }
+        
+        if (!teacher.CanTeach)
+        {
+            throw new UnauthorizedException("Only users with teaching capability can update courses");
+        }
+        
+        var course = await _unitOfWork.Courses.GetByIdAsync(courseId);
+        
+        if (course == null)
+        {
+            throw new NotFoundException("Course not found");
+        }
+        
+        if (course.TeacherId != teacherId)
+        {
+            throw new UnauthorizedException("You can only update your own courses");
+        }
+        
+        // Update course details
+        course.Title = updateCourseDto.Title;
+        course.Description = updateCourseDto.Description;
+        course.UpdatedAt = DateTime.UtcNow;
+        
+        await _unitOfWork.Courses.UpdateAsync(course);
+        await _unitOfWork.SaveChangesAsync();
+        
+        return new CourseResponseDto
+        {
+            Id = course.Id,
+            Title = course.Title,
+            Description = course.Description,
+            InvitationCode = course.InvitationCode,
+            TeacherName = $"{teacher.FirstName} {teacher.LastName}",
+            TeacherId = teacher.Id,
+            Status = course.Status,
+            RejectionReason = course.RejectionReason,
+            CreatedAt = course.CreatedAt,
+            ApprovedAt = course.ApprovedAt
+        };
     }
 }
 

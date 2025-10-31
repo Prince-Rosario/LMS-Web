@@ -25,15 +25,27 @@ public class TokenService : ITokenService
         var audience = jwtSettings["Audience"] ?? "EdifyClient";
         var expiryMinutes = int.Parse(jwtSettings["ExpiryMinutes"] ?? "60");
         
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
             new Claim("firstName", user.FirstName),
             new Claim("lastName", user.LastName),
+            new Claim("canTeach", user.CanTeach.ToString()),
+            new Claim("canStudy", user.CanStudy.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        
+        // Add multiple role claims for users with both capabilities
+        if (user.CanTeach && !claims.Any(c => c.Type == ClaimTypes.Role && c.Value == "Teacher"))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Teacher"));
+        }
+        if (user.CanStudy && !claims.Any(c => c.Type == ClaimTypes.Role && c.Value == "Student"))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Student"));
+        }
         
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
