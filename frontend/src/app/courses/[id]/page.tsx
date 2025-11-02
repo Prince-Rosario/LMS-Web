@@ -74,6 +74,7 @@ export default function CourseDetailPage() {
   const [attachmentType, setAttachmentType] = useState<"none" | "file" | "link">("none");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -92,13 +93,23 @@ export default function CourseDetailPage() {
   }, [courseId, router]);
 
   useEffect(() => {
-    // Filter materials by topic
-    if (selectedTopic === "all") {
-      setFilteredMaterials(materials);
-    } else {
-      setFilteredMaterials(materials.filter(m => m.topic === selectedTopic));
+    // Filter and sort materials
+    let filtered = materials;
+    
+    // Filter by topic
+    if (selectedTopic !== "all") {
+      filtered = materials.filter(m => m.topic === selectedTopic);
     }
-  }, [selectedTopic, materials]);
+    
+    // Sort by date
+    const sorted = [...filtered].sort((a, b) => {
+      const dateA = new Date(a.uploadedAt).getTime();
+      const dateB = new Date(b.uploadedAt).getTime();
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
+    
+    setFilteredMaterials(sorted);
+  }, [selectedTopic, materials, sortOrder]);
 
   const loadCourseDetails = async (token: string) => {
     setLoading(true);
@@ -692,6 +703,43 @@ export default function CourseDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-4">
+            {/* Sort by Date */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">Sort by Date</h3>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setSortOrder("newest")}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sortOrder === "newest"
+                      ? 'bg-slate-900 text-white font-medium'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Newest First
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSortOrder("oldest")}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sortOrder === "oldest"
+                      ? 'bg-slate-900 text-white font-medium'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                    Oldest First
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Filter by Topic */}
             {topics.length > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
