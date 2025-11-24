@@ -156,8 +156,8 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setActiveTab("learning")}
                             className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${activeTab === "learning"
-                                    ? "bg-white text-slate-900 shadow-sm"
-                                    : "text-slate-600 hover:text-slate-900"
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
                                 }`}
                         >
                             My Learning
@@ -166,8 +166,8 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setActiveTab("teaching")}
                             className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${activeTab === "teaching"
-                                    ? "bg-white text-slate-900 shadow-sm"
-                                    : "text-slate-600 hover:text-slate-900"
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
                                 }`}
                         >
                             My Teaching

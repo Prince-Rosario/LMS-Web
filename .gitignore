@@ -84,7 +84,6 @@ ecf/
 rcf/
 
 # Entity Framework Migrations
-# Note: Migrations should be committed to source control
 
 # macOS
 .DS_Store
@@ -111,5 +110,4 @@ LMS_Req.md
 PROJECT_SUMMARY.md
 SPRINT_PLAN.md
 TOKEN_BLACKLIST_IMPLEMENTATION.md
-
 src/Edify.API/appsettings.json
