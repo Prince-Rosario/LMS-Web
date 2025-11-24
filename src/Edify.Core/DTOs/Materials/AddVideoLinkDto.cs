@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using Edify.Core.Validation;
 
 namespace Edify.Core.DTOs.Materials;
 
 /// <summary>
 /// DTO for adding video links (YouTube, Vimeo, etc.)
+/// Supported platforms: YouTube, Vimeo, Dailymotion, Twitch, Wistia, Loom, Vidyard, Google Drive, Microsoft Stream, Kaltura, Panopto, Zoom
 /// </summary>
 public class AddVideoLinkDto
 {
@@ -15,7 +17,7 @@ public class AddVideoLinkDto
     public string? Description { get; set; }
     
     [Required]
-    [Url]
+    [VideoUrl]
     [StringLength(500)]
     public string VideoUrl { get; set; } = string.Empty;
     

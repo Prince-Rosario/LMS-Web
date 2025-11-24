@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/components/Toast";
 
 type JoinCourseFormData = {
   invitationCode: string;
@@ -15,13 +16,14 @@ export default function JoinCoursePage() {
   } = useForm<JoinCourseFormData>();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   const onSubmit = async (data: JoinCourseFormData) => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        alert("Please login first");
+        toast.warning("Please login first");
         router.push("/login");
         return;
       }
@@ -43,30 +45,19 @@ export default function JoinCoursePage() {
         const errorMessage = responseData.errors
           ? Object.values(responseData.errors).flat().join(", ")
           : responseData.message || "Failed to join course";
-        alert(errorMessage);
+        toast.error(errorMessage);
         return;
       }
 
-      alert(
-        `Request sent successfully!\n\n` +
-          `Course: ${responseData.courseTitle}\n` +
-          `Status: ${
-            responseData.status === 0
-              ? "Pending Teacher Approval"
-              : responseData.status === 1
-              ? "Approved"
-              : "Rejected"
-          }\n\n` +
-          `${
-            responseData.status === 0
-              ? "Wait for the teacher to approve your enrollment request."
-              : "You can now access the course materials!"
-          }`
+      toast.success(
+        responseData.status === 0
+          ? `Request sent for "${responseData.courseTitle}"! Awaiting teacher approval.`
+          : `Successfully joined "${responseData.courseTitle}"!`
       );
       router.push("/dashboard");
     } catch (error) {
       console.error("Error:", error);
-      alert("Something went wrong, please try again later.");
+      toast.error("Something went wrong, please try again later.");
     } finally {
       setLoading(false);
     }

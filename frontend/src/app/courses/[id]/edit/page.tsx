@@ -2,6 +2,7 @@
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/components/Toast";
 
 type EditCourseFormData = {
   title: string;
@@ -27,6 +28,7 @@ export default function EditCoursePage() {
     formState: { errors },
     setValue,
   } = useForm<EditCourseFormData>();
+  const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,7 +61,7 @@ export default function EditCoursePage() {
           const userData = JSON.parse(localStorage.getItem("user") || "{}");
           
           if (foundCourse.teacherId && foundCourse.teacherId !== userData.userId) {
-            alert("You don't have permission to edit this course");
+            toast.error("You don't have permission to edit this course");
             router.push(`/courses/${courseId}`);
             return;
           }
@@ -68,17 +70,17 @@ export default function EditCoursePage() {
           setValue("title", foundCourse.title);
           setValue("description", foundCourse.description || "");
         } else {
-          alert("Course not found or you don't have permission to edit it");
+          toast.error("Course not found or you don't have permission to edit it");
           router.push("/dashboard");
         }
       } else {
         const error = await res.json();
-        alert(error.message || "Failed to load course");
+        toast.error(error.message || "Failed to load course");
         router.push("/dashboard");
       }
     } catch (error) {
       console.error("Failed to load course:", error);
-      alert("Failed to load course");
+      toast.error("Failed to load course");
       router.push("/dashboard");
     } finally {
       setLoading(false);
@@ -107,18 +109,18 @@ export default function EditCoursePage() {
       });
 
       if (res.ok) {
-        alert("Course updated successfully!");
+        toast.success("Course updated successfully!");
         router.push(`/courses/${courseId}`);
       } else {
         const error = await res.json();
         const errorMessage = error.errors
           ? Object.values(error.errors).flat().join(", ")
           : error.message || "Failed to update course";
-        alert(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error("Error updating course:", error);
-      alert("Something went wrong");
+      toast.error("Something went wrong");
     } finally {
       setSaving(false);
     }

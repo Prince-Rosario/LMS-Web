@@ -1,6 +1,8 @@
 "use client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type UserData = {
   userId: number;
@@ -53,10 +55,56 @@ const materialTypeIcons: Record<number, { icon: string; color: string; label: st
   7: { icon: "📢", color: "bg-amber-50 text-amber-700 border-amber-200", label: "Post" }
 };
 
+// Helper function for relative time
+const getRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return "Just now";
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 172800) return "Yesterday";
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  return date.toLocaleDateString();
+};
+
+// Check if content is new (within 3 days)
+const isNewContent = (dateString: string): boolean => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+  return diffInDays <= 3;
+};
+
+// Format file size
+const formatFileSize = (bytes?: number): string => {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Extract YouTube video ID
+const getYouTubeVideoId = (url: string): string | null => {
+  const regex = /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
+
+// Extract Vimeo video ID
+const getVimeoVideoId = (url: string): string | null => {
+  const regex = /vimeo\.com\/(?:video\/)?(\d+)/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
+
 export default function CourseDetailPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = params.id as string;
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   const [user, setUser] = useState<UserData | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
@@ -127,13 +175,13 @@ export default function CourseDetailPage() {
           const userData = JSON.parse(localStorage.getItem("user") || "{}");
           setIsTeacher(foundCourse.teacherId === userData.userId);
         } else {
-          alert("Course not found");
+          toast.error("Course not found");
           router.push("/dashboard");
         }
       }
     } catch (error) {
       console.error("Failed to load course:", error);
-      alert("Failed to load course details");
+      toast.error("Failed to load course details");
       router.push("/dashboard");
     } finally {
       setLoading(false);
@@ -165,9 +213,9 @@ export default function CourseDetailPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file size (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size must be less than 5MB");
+      // Validate file size (50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        toast.warning("File size must be less than 50MB");
         return;
       }
       setAttachmentFile(file);
@@ -190,12 +238,12 @@ export default function CourseDetailPage() {
 
   const handleCreatePost = async () => {
     if (!postTitle.trim()) {
-      alert("Please enter a title");
+      toast.warning("Please enter a title");
       return;
     }
 
     if (attachmentType === "link" && attachmentUrl && !attachmentUrl.startsWith("http")) {
-      alert("Please enter a valid URL starting with http:// or https://");
+      toast.warning("Please enter a valid URL starting with http:// or https://");
       return;
     }
 
@@ -241,13 +289,14 @@ export default function CourseDetailPage() {
         setAttachmentUrl("");
         setShowPostForm(false);
         loadMaterials(token!);
+        toast.success("Post created successfully!");
       } else {
         const errorData = await res.json();
-        alert(`Failed to create post: ${errorData.title || "Unknown error"}`);
+        toast.error(`Failed to create post: ${errorData.title || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Failed to create post:", error);
-      alert("Failed to create post");
+      toast.error("Failed to create post");
     } finally {
       setPosting(false);
     }
@@ -279,6 +328,39 @@ export default function CourseDetailPage() {
     }
   };
 
+  const handleDeleteMaterial = async (materialId: number, materialTitle: string) => {
+    const confirmed = await confirm({
+      title: "Delete Material",
+      message: `Are you sure you want to delete "${materialTitle}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:5050/api/materials/${materialId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        toast.success("Material deleted successfully");
+        setMaterials(materials.filter(m => m.id !== materialId));
+      } else {
+        const error = await res.json();
+        toast.error(error.message || "Failed to delete material");
+      }
+    } catch (error) {
+      console.error("Failed to delete material:", error);
+      toast.error("Failed to delete material");
+    }
+  };
+
   const handleDownload = async (materialId: number) => {
     try {
       const token = localStorage.getItem("token");
@@ -303,7 +385,7 @@ export default function CourseDetailPage() {
       }
     } catch (error) {
       console.error("Failed to download:", error);
-      alert("Failed to download file");
+      toast.error("Failed to download file");
     }
   };
 
@@ -610,90 +692,216 @@ export default function CourseDetailPage() {
             ) : (
               filteredMaterials.map((material) => {
                 const typeInfo = materialTypeIcons[material.type] || materialTypeIcons[2];
+                const isNew = isNewContent(material.uploadedAt);
+                const youtubeId = material.fileUrl ? getYouTubeVideoId(material.fileUrl) : null;
+                const vimeoId = material.fileUrl ? getVimeoVideoId(material.fileUrl) : null;
+                const hasVideoPreview = material.type === 1 && (youtubeId || vimeoId);
+                
                 return (
                   <div
                     key={material.id}
-                    className={`rounded-xl border ${!isTeacher && material.isRead
-                      ? 'border-emerald-200 bg-emerald-50/30'
-                      : 'border-slate-200 bg-white'
-                      } p-6 shadow-sm transition-all hover:shadow-md`}
+                    className={`group rounded-xl border overflow-hidden transition-all hover:shadow-lg ${
+                      !isTeacher && material.isRead
+                        ? 'border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
                   >
-                    <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border ${typeInfo.color}`}>
-                        <span className="text-2xl">{typeInfo.icon}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-slate-900 truncate">{material.title}</h3>
-                            {material.description && (
-                              <p className="mt-1 text-sm text-slate-600 line-clamp-2">{material.description}</p>
-                            )}
+                    {/* Video Thumbnail Preview */}
+                    {hasVideoPreview && (
+                      <a
+                        href={material.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative block aspect-video bg-slate-900 overflow-hidden"
+                      >
+                        <img
+                          src={youtubeId 
+                            ? `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
+                            : `https://vumbnail.com/${vimeoId}.jpg`
+                          }
+                          alt={material.title}
+                          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
+                          onError={(e) => {
+                            // Fallback to medium quality for YouTube if maxres doesn't exist
+                            if (youtubeId) {
+                              (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
+                            }
+                          }}
+                        />
+                        {/* Play button overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg group-hover:scale-110 transition-transform">
+                            <svg className="h-8 w-8 text-slate-900 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
                           </div>
-                          {!isTeacher && (
-                            <button
-                              onClick={() => handleMarkAsRead(material.id, material.isRead || false)}
-                              className={`flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${material.isRead
-                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                }`}
-                              title={material.isRead ? "Mark as unread" : "Mark as read"}
-                            >
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </button>
-                          )}
                         </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md ${typeInfo.color}`}>
+                        {/* Duration badge placeholder */}
+                        <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/80 text-white text-xs font-medium">
+                          Video
+                        </div>
+                      </a>
+                    )}
+                    
+                    <div className="p-5">
+                      {/* Header row with badges */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Type badge with icon */}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${typeInfo.color}`}>
+                            <span>{typeInfo.icon}</span>
                             {typeInfo.label}
                           </span>
+                          
+                          {/* NEW badge */}
+                          {isNew && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-violet-500 to-purple-500 text-white text-xs font-bold animate-pulse">
+                              NEW
+                            </span>
+                          )}
+                          
+                          {/* Topic badge */}
                           {material.topic && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-600">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs">
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                               </svg>
                               {material.topic}
                             </span>
                           )}
-                          <span>•</span>
-                          <span>{material.uploadedBy}</span>
-                          <span>•</span>
-                          <span>{new Date(material.uploadedAt).toLocaleDateString()}</span>
                         </div>
-
-                        {/* Actions */}
-                        {(material.hasFileData || material.fileUrl) && (
-                          <div className="mt-4 flex gap-2">
-                            {material.hasFileData && (
-                              <button
-                                onClick={() => handleDownload(material.id)}
-                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                Download {material.fileName}
-                              </button>
-                            )}
-                            {material.fileUrl && (
-                              <a
-                                href={material.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                Open Link
-                              </a>
-                            )}
+                        
+                        {/* Mark as read button (students only) */}
+                        {!isTeacher && (
+                          <button
+                            onClick={() => handleMarkAsRead(material.id, material.isRead || false)}
+                            className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                              material.isRead
+                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                            }`}
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {material.isRead ? "Completed" : "Mark done"}
+                          </button>
+                        )}
+                        
+                        {/* Teacher actions dropdown */}
+                        {isTeacher && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => router.push(`/courses/${courseId}/materials/${material.id}/edit`)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800 transition-all"
+                              title="Edit material"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMaterial(material.id, material.title)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-all"
+                              title="Delete material"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
                           </div>
                         )}
                       </div>
+
+                      {/* Title and description */}
+                      <h3 className="text-lg font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">
+                        {material.title}
+                      </h3>
+                      {material.description && (
+                        <p className="mt-2 text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                          {material.description}
+                        </p>
+                      )}
+
+                      {/* Meta info row */}
+                      <div className="mt-4 flex items-center gap-3 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          {material.uploadedBy}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1" title={new Date(material.uploadedAt).toLocaleString()}>
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {getRelativeTime(material.uploadedAt)}
+                        </span>
+                        {material.fileSize && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {formatFileSize(material.fileSize)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      {(material.hasFileData || material.fileUrl) && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+                          {material.hasFileData && (
+                            <button
+                              onClick={() => handleDownload(material.id)}
+                              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              Download
+                              {material.fileName && (
+                                <span className="text-slate-400 font-normal">
+                                  ({material.fileName.length > 20 
+                                    ? material.fileName.substring(0, 17) + '...' 
+                                    : material.fileName})
+                                </span>
+                              )}
+                            </button>
+                          )}
+                          {material.fileUrl && !hasVideoPreview && (
+                            <a
+                              href={material.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Open Link
+                            </a>
+                          )}
+                          {hasVideoPreview && (
+                            <a
+                              href={material.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                              Watch Video
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -828,7 +1036,7 @@ export default function CourseDetailPage() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(course.invitationCode);
-                    alert("Code copied!");
+                    toast.success("Code copied!");
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"
                 >

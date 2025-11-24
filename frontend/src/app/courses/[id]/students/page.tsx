@@ -1,6 +1,8 @@
 "use client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type EnrollmentRequest = {
   id: number;
@@ -27,6 +29,8 @@ export default function ManageStudentsPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = params.id as string;
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<"pending" | "enrolled">("pending");
   const [courseName, setCourseName] = useState("");
@@ -81,7 +85,7 @@ export default function ManageStudentsPage() {
       }
     } catch (error) {
       console.error("Failed to load data:", error);
-      alert("Failed to load student data");
+      toast.error("Failed to load student data");
     } finally {
       setLoading(false);
     }
@@ -106,7 +110,7 @@ export default function ManageStudentsPage() {
       );
 
       if (res.ok) {
-        alert(approve ? "Student approved!" : "Student rejected");
+        toast.success(approve ? "Student approved!" : "Student rejected");
         setEnrollmentRequests((prev) =>
           prev.filter((req) => req.id !== enrollmentId)
         );
@@ -116,20 +120,26 @@ export default function ManageStudentsPage() {
         }
       } else {
         const error = await res.json();
-        alert(error.message || "Failed to process request");
+        toast.error(error.message || "Failed to process request");
       }
     } catch (error) {
       console.error("Error processing request:", error);
-      alert("Something went wrong");
+      toast.error("Something went wrong");
     } finally {
       setProcessing(null);
     }
   };
 
   const handleRemoveStudent = async (enrollmentId: number, studentName: string) => {
-    if (!confirm(`Are you sure you want to remove ${studentName} from this course?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Remove Student",
+      message: `Are you sure you want to remove ${studentName} from this course? They will need to re-enroll to access the course again.`,
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
+
+    if (!confirmed) return;
 
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -147,17 +157,17 @@ export default function ManageStudentsPage() {
       );
 
       if (res.ok) {
-        alert("Student removed successfully");
+        toast.success("Student removed successfully");
         setEnrolledStudents((prev) =>
           prev.filter((student) => student.id !== enrollmentId)
         );
       } else {
         const error = await res.json();
-        alert(error.message || "Failed to remove student");
+        toast.error(error.message || "Failed to remove student");
       }
     } catch (error) {
       console.error("Error removing student:", error);
-      alert("Something went wrong");
+      toast.error("Something went wrong");
     } finally {
       setProcessing(null);
     }
@@ -339,8 +349,15 @@ export default function ManageStudentsPage() {
                           )}
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to reject ${request.studentName}?`)) {
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: "Reject Student",
+                              message: `Are you sure you want to reject ${request.studentName}'s enrollment request?`,
+                              confirmText: "Reject",
+                              cancelText: "Cancel",
+                              variant: "warning",
+                            });
+                            if (confirmed) {
                               handleApproveReject(request.id, false);
                             }
                           }}

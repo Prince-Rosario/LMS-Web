@@ -1,6 +1,7 @@
 "use client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
 
 type Material = {
     id: number;
@@ -28,6 +29,7 @@ export default function MaterialsPage() {
     const router = useRouter();
     const params = useParams();
     const courseId = params.id as string;
+    const { toast } = useToast();
 
     const [user, setUser] = useState<UserData | null>(null);
     const [materials, setMaterials] = useState<Material[]>([]);
@@ -98,7 +100,7 @@ export default function MaterialsPage() {
 
     const handleFileUpload = async () => {
         if (!file || !title) {
-            alert("Please provide a title and select a file");
+            toast.warning("Please provide a title and select a file");
             return;
         }
 
@@ -131,16 +133,16 @@ export default function MaterialsPage() {
             });
 
             if (res.ok) {
-                alert("File uploaded successfully!");
+                toast.success("File uploaded successfully!");
                 resetForm();
                 loadMaterials(token);
             } else {
                 const error = await res.json();
-                alert(error.message || "Failed to upload file");
+                toast.error(error.message || "Failed to upload file");
             }
         } catch (error) {
             console.error("Upload error:", error);
-            alert("Failed to upload file");
+            toast.error("Failed to upload file");
         } finally {
             setUploading(false);
         }
@@ -148,7 +150,7 @@ export default function MaterialsPage() {
 
     const handleVideoLinkAdd = async () => {
         if (!videoUrl || !title) {
-            alert("Please provide a title and video URL");
+            toast.warning("Please provide a title and video URL");
             return;
         }
 
@@ -176,16 +178,16 @@ export default function MaterialsPage() {
             });
 
             if (res.ok) {
-                alert("Video link added successfully!");
+                toast.success("Video link added successfully!");
                 resetForm();
                 loadMaterials(token);
             } else {
                 const error = await res.json();
-                alert(error.message || "Failed to add video link");
+                toast.error(error.message || "Failed to add video link");
             }
         } catch (error) {
             console.error("Upload error:", error);
-            alert("Failed to add video link");
+            toast.error("Failed to add video link");
         } finally {
             setUploading(false);
         }
@@ -216,11 +218,11 @@ export default function MaterialsPage() {
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
             } else {
-                alert("Failed to download file");
+                toast.error("Failed to download file");
             }
         } catch (error) {
             console.error("Download error:", error);
-            alert("Failed to download file");
+            toast.error("Failed to download file");
         }
     };
 
@@ -437,7 +439,7 @@ export default function MaterialsPage() {
 
                                     <div>
                                         <label htmlFor="file" className="mb-2 block text-sm font-medium text-slate-900">
-                                            File (Max 5MB)
+                                            File (Max 50MB)
                                             <span className="ml-1 text-rose-500">*</span>
                                         </label>
                                         <input

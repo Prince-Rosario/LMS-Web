@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
 
 type UserData = {
     userId: number;
@@ -27,6 +28,7 @@ type Course = {
 
 export default function AdminDashboard() {
     const router = useRouter();
+    const { toast } = useToast();
     const [user, setUser] = useState<UserData | null>(null);
     const [pendingCourses, setPendingCourses] = useState<Course[]>([]);
     const [allCourses, setAllCourses] = useState<Course[]>([]);
@@ -106,13 +108,14 @@ export default function AdminDashboard() {
 
             if (res.ok) {
                 loadData(token);
+                toast.success("Course approved successfully!");
             } else {
                 const error = await res.json();
-                alert(error.message || "Failed to approve course");
+                toast.error(error.message || "Failed to approve course");
             }
         } catch (error) {
             console.error("Error approving course:", error);
-            alert("Something went wrong");
+            toast.error("Something went wrong");
         } finally {
             setProcessingId(null);
         }
@@ -123,7 +126,7 @@ export default function AdminDashboard() {
         if (!token) return;
 
         if (!rejectionReason.trim()) {
-            alert("Please provide a rejection reason");
+            toast.warning("Please provide a rejection reason");
             return;
         }
 
@@ -146,13 +149,14 @@ export default function AdminDashboard() {
                 setRejectingCourseId(null);
                 setRejectionReason("");
                 loadData(token);
+                toast.success("Course rejected");
             } else {
                 const error = await res.json();
-                alert(error.message || "Failed to reject course");
+                toast.error(error.message || "Failed to reject course");
             }
         } catch (error) {
             console.error("Error rejecting course:", error);
-            alert("Something went wrong");
+            toast.error("Something went wrong");
         } finally {
             setProcessingId(null);
         }
@@ -174,13 +178,14 @@ export default function AdminDashboard() {
             if (res.ok) {
                 setDeletingCourseId(null);
                 loadData(token);
+                toast.success("Course deleted successfully");
             } else {
                 const error = await res.json();
-                alert(error.message || "Failed to delete course");
+                toast.error(error.message || "Failed to delete course");
             }
         } catch (error) {
             console.error("Error deleting course:", error);
-            alert("Something went wrong");
+            toast.error("Something went wrong");
         } finally {
             setProcessingId(null);
         }

@@ -3,6 +3,7 @@ using Edify.Core.DTOs.Materials;
 using Edify.Core.Entities;
 using Edify.Core.Enums;
 using Edify.Core.Interfaces;
+using Edify.Core.Validation;
 
 namespace Edify.BLL.Services;
 
@@ -87,11 +88,11 @@ public class MaterialService : IMaterialService
             throw new UnauthorizedException("You are not authorized to upload materials to this course");
         }
         
-        // Validate file size (limit to 5MB for Base64 storage)
+        // Validate file size (limit to 50MB for Base64 storage)
         var fileBytes = Convert.FromBase64String(uploadDto.FileDataBase64);
-        if (fileBytes.Length > 5 * 1024 * 1024) // 5MB
+        if (fileBytes.Length > 50 * 1024 * 1024) // 50MB
         {
-            throw new BadRequestException("File size exceeds 5MB limit for database storage");
+            throw new BadRequestException("File size exceeds 50MB limit for database storage");
         }
         
         // Validate file type
@@ -161,6 +162,12 @@ public class MaterialService : IMaterialService
             throw new UnauthorizedException("You are not authorized to add materials to this course");
         }
         
+        // Validate video URL is from a supported platform
+        if (!VideoUrlAttribute.IsValidVideoUrl(videoDto.VideoUrl))
+        {
+            throw new BadRequestException($"Invalid video URL. Only links from supported platforms are allowed: {string.Join(", ", VideoUrlAttribute.SupportedPlatforms)}");
+        }
+        
         var material = new Material
         {
             Title = videoDto.Title,
@@ -228,10 +235,10 @@ public class MaterialService : IMaterialService
         {
             var fileBytes = Convert.FromBase64String(postDto.FileDataBase64);
             
-            // Validate file size (limit to 5MB)
-            if (fileBytes.Length > 5 * 1024 * 1024)
+            // Validate file size (limit to 50MB)
+            if (fileBytes.Length > 50 * 1024 * 1024)
             {
-                throw new BadRequestException("File size exceeds 5MB limit");
+                throw new BadRequestException("File size exceeds 50MB limit");
             }
             
             material.FileDataBase64 = postDto.FileDataBase64;

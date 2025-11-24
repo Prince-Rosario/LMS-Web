@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/components/Toast";
 
 type CreateCourseFormData = {
   title: string;
@@ -16,13 +17,14 @@ export default function CreateCoursePage() {
   } = useForm<CreateCourseFormData>();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   const onSubmit = async (data: CreateCourseFormData) => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        alert("Please login first");
+        toast.warning("Please login first");
         router.push("/login");
         return;
       }
@@ -42,29 +44,19 @@ export default function CreateCoursePage() {
         const errorMessage = responseData.errors
           ? Object.values(responseData.errors).flat().join(", ")
           : responseData.message || "Course creation failed";
-        alert(errorMessage);
+        toast.error(errorMessage);
         return;
       }
 
-      alert(
-        `Course created successfully!\n\n` +
-        `Title: ${responseData.title}\n` +
-        `Invitation Code: ${responseData.invitationCode}\n` +
-        `Status: ${responseData.status === 0
-          ? "Pending Admin Approval"
-          : responseData.status === 1
-            ? "Approved"
-            : "Rejected"
-        }\n\n` +
-        `${responseData.status === 0
-          ? "Your course is pending admin approval. You'll be notified once it's reviewed."
-          : ""
-        }`
+      toast.success(
+        responseData.status === 0
+          ? `Course "${responseData.title}" created! Pending admin approval.`
+          : `Course "${responseData.title}" created successfully!`
       );
       router.push("/dashboard");
     } catch (error) {
       console.error("Error:", error);
-      alert("Something went wrong, please try again later.");
+      toast.error("Something went wrong, please try again later.");
     } finally {
       setLoading(false);
     }
