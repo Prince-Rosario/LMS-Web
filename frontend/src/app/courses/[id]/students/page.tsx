@@ -30,7 +30,7 @@ export default function ManageStudentsPage() {
   const params = useParams();
   const courseId = params.id as string;
   const { toast } = useToast();
-  const { confirm } = useConfirm();
+  const { confirm, isDialogOpen } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<"pending" | "enrolled">("pending");
   const [courseName, setCourseName] = useState("");
@@ -38,6 +38,7 @@ export default function ManageStudentsPage() {
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -131,6 +132,10 @@ export default function ManageStudentsPage() {
   };
 
   const handleRemoveStudent = async (enrollmentId: number, studentName: string) => {
+    // Prevent multiple dialogs
+    if (confirmingId !== null || isDialogOpen) return;
+    
+    setConfirmingId(enrollmentId);
     const confirmed = await confirm({
       title: "Remove Student",
       message: `Are you sure you want to remove ${studentName} from this course? They will need to re-enroll to access the course again.`,
@@ -138,6 +143,7 @@ export default function ManageStudentsPage() {
       cancelText: "Cancel",
       variant: "danger",
     });
+    setConfirmingId(null);
 
     if (!confirmed) return;
 
@@ -350,6 +356,10 @@ export default function ManageStudentsPage() {
                         </button>
                         <button
                           onClick={async () => {
+                            // Prevent multiple dialogs
+                            if (confirmingId !== null || isDialogOpen) return;
+                            
+                            setConfirmingId(request.id);
                             const confirmed = await confirm({
                               title: "Reject Student",
                               message: `Are you sure you want to reject ${request.studentName}'s enrollment request?`,
@@ -357,11 +367,13 @@ export default function ManageStudentsPage() {
                               cancelText: "Cancel",
                               variant: "warning",
                             });
+                            setConfirmingId(null);
+                            
                             if (confirmed) {
                               handleApproveReject(request.id, false);
                             }
                           }}
-                          disabled={processing === request.id}
+                          disabled={processing === request.id || confirmingId === request.id}
                           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -461,7 +473,7 @@ export default function ManageStudentsPage() {
 
                       <button
                         onClick={() => handleRemoveStudent(student.id, student.studentName)}
-                        disabled={processing === student.id}
+                        disabled={processing === student.id || confirmingId === student.id}
                         className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-all hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {processing === student.id ? (

@@ -27,7 +27,7 @@ interface CommentsProps {
 
 export function Comments({ entityType, entityId, courseId }: CommentsProps) {
   const { toast } = useToast();
-  const { confirm } = useConfirm();
+  const { confirm, isDialogOpen } = useConfirm();
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
@@ -37,6 +37,7 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
   const [editContent, setEditContent] = useState('');
   const [currentUser, setCurrentUser] = useState<{ userId: number; role: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -183,12 +184,17 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
   };
 
   const handleDeleteComment = async (commentId: number) => {
+    // Prevent multiple dialogs
+    if (deletingCommentId !== null || isDialogOpen) return;
+    
+    setDeletingCommentId(commentId);
     const confirmed = await confirm({
       title: 'Delete Comment',
       message: 'Are you sure you want to delete this comment? This action cannot be undone.',
       confirmText: 'Delete',
       variant: 'danger',
     });
+    setDeletingCommentId(null);
 
     if (!confirmed) return;
 
@@ -283,7 +289,8 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
                 </button>
                 <button
                   onClick={() => handleDeleteComment(comment.id)}
-                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                  disabled={deletingCommentId === comment.id}
+                  className="p-1 text-slate-400 hover:text-rose-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

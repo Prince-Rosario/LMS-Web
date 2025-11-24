@@ -104,7 +104,7 @@ export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
   const { toast } = useToast();
-  const { confirm } = useConfirm();
+  const { confirm, isDialogOpen } = useConfirm();
 
   const [user, setUser] = useState<UserData | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
@@ -115,6 +115,7 @@ export default function CourseDetailPage() {
   const [showPostForm, setShowPostForm] = useState(false);
   const [postTitle, setPostTitle] = useState("");
   const [postDescription, setPostDescription] = useState("");
+  const [deletingMaterialId, setDeletingMaterialId] = useState<number | null>(null);
   const [postTopic, setPostTopic] = useState("");
   const [posting, setPosting] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string>("all");
@@ -329,6 +330,10 @@ export default function CourseDetailPage() {
   };
 
   const handleDeleteMaterial = async (materialId: number, materialTitle: string) => {
+    // Prevent multiple dialogs
+    if (deletingMaterialId !== null || isDialogOpen) return;
+    
+    setDeletingMaterialId(materialId);
     const confirmed = await confirm({
       title: "Delete Material",
       message: `Are you sure you want to delete "${materialTitle}"? This action cannot be undone.`,
@@ -336,6 +341,7 @@ export default function CourseDetailPage() {
       cancelText: "Cancel",
       variant: "danger",
     });
+    setDeletingMaterialId(null);
 
     if (!confirmed) return;
 
@@ -803,7 +809,8 @@ export default function CourseDetailPage() {
                             </button>
                             <button
                               onClick={() => handleDeleteMaterial(material.id, material.title)}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-all"
+                              disabled={deletingMaterialId === material.id}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Delete material"
                             >
                               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

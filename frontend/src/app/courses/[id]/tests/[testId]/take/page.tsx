@@ -59,7 +59,7 @@ export default function TakeTestPage() {
   const courseId = parseInt(params.id as string);
   const testId = parseInt(params.testId as string);
   const { toast } = useToast();
-  const { confirm } = useConfirm();
+  const { confirm, isDialogOpen } = useConfirm();
 
   const [test, setTest] = useState<Test | null>(null);
   const [attemptId, setAttemptId] = useState<number | null>(null);
@@ -70,6 +70,7 @@ export default function TakeTestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasSubmittedRef = useRef(false);
   const hasLoadedRef = useRef(false);
@@ -250,15 +251,20 @@ export default function TakeTestPage() {
   };
 
   const handleSubmit = async () => {
+    // Prevent multiple dialogs
+    if (isConfirming || isDialogOpen) return;
+    
     const unanswered = test?.questions.filter(q => {
       const answer = answers[q.id];
+      if (!answer) return true; // No answer recorded = unanswered
       if ([0, 1, 2].includes(q.type)) {
-        return answer.selectedOptionIds.length === 0;
+        return !answer.selectedOptionIds || answer.selectedOptionIds.length === 0;
       }
       return !answer.textAnswer?.trim();
     });
 
     if (unanswered && unanswered.length > 0) {
+      setIsConfirming(true);
       const confirmed = await confirm({
         title: 'Unanswered Questions',
         message: `You have ${unanswered.length} unanswered question(s). Are you sure you want to submit?`,
@@ -266,6 +272,7 @@ export default function TakeTestPage() {
         cancelText: 'Review',
         variant: 'warning',
       });
+      setIsConfirming(false);
       if (!confirmed) return;
     }
 

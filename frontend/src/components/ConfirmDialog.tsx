@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react";
 
 interface ConfirmOptions {
     title: string;
@@ -11,6 +11,7 @@ interface ConfirmOptions {
 
 interface ConfirmContextType {
     confirm: (options: ConfirmOptions) => Promise<boolean>;
+    isDialogOpen: boolean;
 }
 
 const ConfirmContext = createContext<ConfirmContextType | null>(null);
@@ -38,8 +39,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         variant: "default",
         resolve: null,
     });
+    
+    // Use ref to track if dialog is open to prevent race conditions
+    const isOpenRef = useRef(false);
 
     const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
+        // If a dialog is already open, immediately return false to prevent race conditions
+        if (isOpenRef.current) {
+            return Promise.resolve(false);
+        }
+        
+        isOpenRef.current = true;
+        
         return new Promise((resolve) => {
             setDialog({
                 isOpen: true,
@@ -54,11 +65,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const handleConfirm = () => {
+        isOpenRef.current = false;
         dialog.resolve?.(true);
         setDialog((prev) => ({ ...prev, isOpen: false, resolve: null }));
     };
 
     const handleCancel = () => {
+        isOpenRef.current = false;
         dialog.resolve?.(false);
         setDialog((prev) => ({ ...prev, isOpen: false, resolve: null }));
     };
@@ -81,7 +94,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     const styles = variantStyles[dialog.variant || "default"];
 
     return (
-        <ConfirmContext.Provider value={{ confirm }}>
+        <ConfirmContext.Provider value={{ confirm, isDialogOpen: dialog.isOpen }}>
             {children}
 
             {/* Dialog Overlay */}
