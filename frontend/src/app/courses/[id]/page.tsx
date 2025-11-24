@@ -816,7 +816,10 @@ export default function CourseDetailPage() {
                       </div>
 
                       {/* Title and description */}
-                      <h3 className="text-lg font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">
+                      <h3 
+                        onClick={() => router.push(`/courses/${courseId}/materials/${material.id}`)}
+                        className="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
                         {material.title}
                       </h3>
                       {material.description && (
@@ -900,6 +903,15 @@ export default function CourseDetailPage() {
                               Watch Video
                             </a>
                           )}
+                          <button
+                            onClick={() => router.push(`/courses/${courseId}/materials/${material.id}`)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            Comments
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1023,6 +1035,26 @@ export default function CourseDetailPage() {
                     View All Materials
                   </button>
                 )}
+                {/* Tests & Quizzes - Available for everyone */}
+                <button
+                  onClick={() => router.push(`/courses/${courseId}/tests`)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Tests & Quizzes
+                </button>
+                {/* Group Chat - Available for everyone */}
+                <button
+                  onClick={() => router.push(`/courses/${courseId}/chat`)}
+                  className="flex w-full items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Group Chat
+                </button>
               </div>
             </div>
 

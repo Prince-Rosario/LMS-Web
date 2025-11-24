@@ -2,12 +2,15 @@
 import { ReactNode } from "react";
 import { ToastProvider } from "./Toast";
 import { ConfirmProvider } from "./ConfirmDialog";
+import { ChatProvider } from "@/contexts/ChatContext";
 
 export function Providers({ children }: { children: ReactNode }) {
     return (
         <ToastProvider>
             <ConfirmProvider>
-                {children}
+                <ChatProvider>
+                    {children}
+                </ChatProvider>
             </ConfirmProvider>
         </ToastProvider>
     );

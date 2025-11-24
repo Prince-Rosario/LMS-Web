@@ -11,6 +11,7 @@ public interface ICourseService
     Task<IEnumerable<CourseResponseDto>> GetStudentCoursesAsync(int studentId);
     Task<IEnumerable<CourseResponseDto>> GetTeacherCoursesAsync(int teacherId);
     Task<IEnumerable<CourseResponseDto>> GetAllUserCoursesAsync(int userId);
+    Task<CourseResponseDto> GetCourseByIdAsync(int courseId, int userId);
     
     // Admin methods
     Task<IEnumerable<CourseResponseDto>> GetPendingCoursesAsync(int adminId);

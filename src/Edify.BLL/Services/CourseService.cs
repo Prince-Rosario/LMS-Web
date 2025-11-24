@@ -322,6 +322,63 @@ public class CourseService : ICourseService
         
         return courseDtos;
     }
+
+    public async Task<CourseResponseDto> GetCourseByIdAsync(int courseId, int userId)
+    {
+        var course = await _unitOfWork.Courses.GetByIdAsync(courseId);
+        if (course == null || !course.IsActive)
+        {
+            throw new NotFoundException("Course not found");
+        }
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null)
+        {
+            throw new NotFoundException("User not found");
+        }
+
+        // Check if user has access to this course
+        bool hasAccess = false;
+        
+        // Admin can see all courses
+        if (user.Role == UserRole.Admin)
+        {
+            hasAccess = true;
+        }
+        // Teacher of the course
+        else if (course.TeacherId == userId)
+        {
+            hasAccess = true;
+        }
+        // Enrolled student
+        else
+        {
+            var enrollment = await _unitOfWork.Enrollments.GetAsync(
+                e => e.StudentId == userId && e.CourseId == courseId && e.Status == EnrollmentStatus.Approved);
+            hasAccess = enrollment != null;
+        }
+
+        if (!hasAccess)
+        {
+            throw new NotFoundException("Course not found or you don't have access");
+        }
+
+        var teacher = await _unitOfWork.Users.GetByIdAsync(course.TeacherId);
+
+        return new CourseResponseDto
+        {
+            Id = course.Id,
+            Title = course.Title,
+            Description = course.Description,
+            InvitationCode = course.InvitationCode,
+            TeacherName = $"{teacher?.FirstName} {teacher?.LastName}",
+            TeacherId = course.TeacherId,
+            Status = course.Status,
+            RejectionReason = course.RejectionReason,
+            CreatedAt = course.CreatedAt,
+            ApprovedAt = course.ApprovedAt
+        };
+    }
     
     public async Task<IEnumerable<CourseResponseDto>> GetPendingCoursesAsync(int adminId)
     {
