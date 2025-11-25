@@ -18,3 +18,4 @@ public class ChatMessage : BaseEntity
     public ICollection<ChatMessage> Replies { get; set; } = new List<ChatMessage>();
 }
 
+

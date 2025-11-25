@@ -11,3 +11,4 @@ public class ChatRoom : BaseEntity
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
 }
 
+
