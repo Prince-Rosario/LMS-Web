@@ -11,12 +11,14 @@ interface Comment {
   content: string;
   createdAt: string;
   updatedAt?: string;
-  userId: number;
-  userName: string;
-  userRole: string;
+  authorId: number;
+  authorName: string;
+  authorInitials: string;
+  isTeacher: boolean;
   parentCommentId?: number;
   replies?: Comment[];
   isEdited: boolean;
+  isOwnComment: boolean;
 }
 
 interface CommentsProps {
@@ -51,15 +53,18 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
     if (!token) return;
 
     try {
+      // Map entityType to lowercase for API endpoint
+      const endpoint = entityType.toLowerCase();
       const response = await fetch(
-        `${API_URL}/api/comments/${entityType}/${entityId}`,
+        `${API_URL}/api/comments/${endpoint}/${entityId}?includeReplies=true`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.ok) {
         const data = await response.json();
-        // Ensure data is an array
-        setComments(Array.isArray(data) ? data : []);
+        // API returns CommentsPageDto with comments array
+        const commentsArray = data.comments || data.Comments || [];
+        setComments(Array.isArray(commentsArray) ? commentsArray : []);
       } else {
         // If the endpoint returns an error, set empty array
         setComments([]);
@@ -83,6 +88,13 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
 
+    // Map entityType string to CommentableType enum
+    const commentableTypeMap: Record<string, number> = {
+      'Material': 0,
+      'Test': 1,
+      'TestAttempt': 2
+    };
+
     try {
       const response = await fetch(`${API_URL}/api/comments`, {
         method: 'POST',
@@ -91,10 +103,9 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          content: newComment,
-          entityType,
-          entityId,
-          courseId,
+          Content: newComment,
+          CommentableType: commentableTypeMap[entityType],
+          CommentableId: entityId,
         }),
       });
 
@@ -119,6 +130,13 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
 
+    // Map entityType string to CommentableType enum
+    const commentableTypeMap: Record<string, number> = {
+      'Material': 0,
+      'Test': 1,
+      'TestAttempt': 2
+    };
+
     try {
       const response = await fetch(`${API_URL}/api/comments`, {
         method: 'POST',
@@ -127,11 +145,10 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          content: replyContent,
-          entityType,
-          entityId,
-          courseId,
-          parentCommentId: parentId,
+          Content: replyContent,
+          CommentableType: commentableTypeMap[entityType],
+          CommentableId: entityId,
+          ParentCommentId: parentId,
         }),
       });
 
@@ -164,7 +181,7 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content: editContent }),
+        body: JSON.stringify({ Content: editContent }),
       });
 
       if (response.ok) {
@@ -244,7 +261,7 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
   };
 
   const renderComment = (comment: Comment, isReply = false) => {
-    const isOwner = currentUser?.userId === comment.userId;
+    const isOwner = currentUser?.userId === comment.authorId;
     const isAdmin = currentUser?.role === 'Admin';
     const canModify = isOwner || isAdmin;
 
@@ -254,17 +271,17 @@ export function Comments({ entityType, entityId, courseId }: CommentsProps) {
         className={`${isReply ? 'ml-8 border-l-2 border-slate-200 pl-4' : ''}`}
       >
         <div className="group rounded-lg bg-slate-50 p-4 hover:bg-slate-100 transition-colors">
-          <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm font-medium">
-                {comment.userName.charAt(0).toUpperCase()}
+                {comment.authorInitials || comment.authorName.charAt(0).toUpperCase()}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-slate-900">{comment.userName}</span>
-                  {comment.userRole && comment.userRole !== 'Student' && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(comment.userRole)}`}>
-                      {comment.userRole}
+                  <span className="font-medium text-slate-900">{comment.authorName}</span>
+                  {comment.isTeacher && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor('Teacher')}`}>
+                      Teacher
                     </span>
                   )}
                 </div>

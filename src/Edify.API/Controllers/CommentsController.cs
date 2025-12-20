@@ -157,6 +157,36 @@ public class CommentsController : ControllerBase
     }
 
     /// <summary>
+    /// Get comments for a test attempt
+    /// </summary>
+    /// <param name="testAttemptId">Test Attempt ID</param>
+    /// <param name="page">Page number</param>
+    /// <param name="pageSize">Page size</param>
+    /// <param name="includeReplies">Include nested replies</param>
+    /// <returns>Paginated list of comments</returns>
+    [HttpGet("testattempt/{testAttemptId}")]
+    [ProducesResponseType(typeof(CommentsPageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<CommentsPageDto>> GetTestAttemptComments(
+        int testAttemptId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool includeReplies = true)
+    {
+        var userId = GetUserId();
+        var comments = await _commentService.GetCommentsAsync(userId, new GetCommentsDto
+        {
+            CommentableType = CommentableType.TestAttempt,
+            CommentableId = testAttemptId,
+            Page = page,
+            PageSize = pageSize,
+            IncludeReplies = includeReplies
+        });
+        return Ok(comments);
+    }
+
+    /// <summary>
     /// Get comment count for an item
     /// </summary>
     /// <param name="type">Type: 0=Material, 1=Test, 2=TestAttempt</param>
@@ -170,5 +200,6 @@ public class CommentsController : ControllerBase
         return Ok(new { count });
     }
 }
+
 
 

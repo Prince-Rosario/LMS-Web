@@ -12,3 +12,7 @@ public class ChatRoom : BaseEntity
 }
 
 
+
+
+
+

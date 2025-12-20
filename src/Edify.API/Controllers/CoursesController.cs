@@ -321,6 +321,47 @@ public class CoursesController : ControllerBase
         var course = await _courseService.UpdateCourseAsync(teacherId, courseId, updateCourseDto);
         return Ok(course);
     }
+
+    /// <summary>
+    /// Get my progress across all enrolled courses (Student only)
+    /// </summary>
+    /// <returns>Student progress summary with materials and tests completion</returns>
+    /// <response code="200">Returns the student's progress summary</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not a student</response>
+    [HttpGet("my-progress")]
+    [Authorize(Roles = "Student")]
+    [ProducesResponseType(typeof(StudentProgressSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<StudentProgressSummaryDto>> GetMyProgress()
+    {
+        var userId = GetUserId();
+        var progress = await _courseService.GetStudentProgressAsync(userId);
+        return Ok(progress);
+    }
+
+    /// <summary>
+    /// Get student progress for a specific course (Teacher only)
+    /// </summary>
+    /// <param name="courseId">Course ID</param>
+    /// <returns>Progress details for all students in the course</returns>
+    /// <response code="200">Returns student progress for the course</response>
+    /// <response code="401">If user is not authenticated</response>
+    /// <response code="403">If user is not the teacher of this course</response>
+    /// <response code="404">If the course is not found</response>
+    [HttpGet("{courseId}/student-progress")]
+    [Authorize(Roles = "Teacher")]
+    [ProducesResponseType(typeof(CourseStudentProgressDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CourseStudentProgressDto>> GetCourseStudentProgress(int courseId)
+    {
+        var userId = GetUserId();
+        var progress = await _courseService.GetCourseStudentProgressAsync(userId, courseId);
+        return Ok(progress);
+    }
 }
 
 

@@ -575,6 +575,232 @@ public class CourseService : ICourseService
             ApprovedAt = course.ApprovedAt
         };
     }
+
+    public async Task<StudentProgressSummaryDto> GetStudentProgressAsync(int studentId)
+    {
+        var student = await _unitOfWork.Users.GetByIdAsync(studentId);
+        if (student == null || !student.CanStudy)
+        {
+            throw new UnauthorizedException("Only students can view progress");
+        }
+
+        // Get all approved enrollments
+        var enrollments = await _unitOfWork.Enrollments.FindAsync(
+            e => e.StudentId == studentId && e.Status == EnrollmentStatus.Approved);
+        var enrollmentsList = enrollments.ToList();
+
+        var courseProgressList = new List<CourseProgressItemDto>();
+        int totalMaterials = 0;
+        int completedMaterials = 0;
+        int totalTests = 0;
+        int completedTests = 0;
+        decimal totalTestScore = 0;
+        int gradedTestsCount = 0;
+
+        foreach (var enrollment in enrollmentsList)
+        {
+            var course = await _unitOfWork.Courses.GetByIdAsync(enrollment.CourseId);
+            if (course == null || !course.IsActive) continue;
+
+            // Get materials for this course
+            var courseMaterials = await _unitOfWork.Materials.FindAsync(
+                m => m.CourseId == course.Id && m.IsActive);
+            var materialsList = courseMaterials.ToList();
+            int courseTotalMaterials = materialsList.Count;
+            
+            // Get materials read by student
+            var materialsRead = await _unitOfWork.MaterialProgress.FindAsync(
+                mp => mp.StudentId == studentId && mp.IsRead && 
+                      materialsList.Select(m => m.Id).Contains(mp.MaterialId));
+            int courseMaterialsRead = materialsRead.Count();
+
+            // Get tests for this course
+            var courseTests = await _unitOfWork.Tests.FindAsync(
+                t => t.CourseId == course.Id && t.IsActive && t.Status == TestStatus.Published);
+            var testsList = courseTests.ToList();
+            int courseTotalTests = testsList.Count;
+
+            // Get test attempts for student
+            var testAttempts = await _unitOfWork.TestAttempts.FindAsync(
+                ta => ta.StudentId == studentId && 
+                      testsList.Select(t => t.Id).Contains(ta.TestId) &&
+                      (ta.Status == TestAttemptStatus.Submitted || ta.Status == TestAttemptStatus.Graded));
+            var attemptsList = testAttempts.ToList();
+            
+            // Get unique tests completed (best attempt per test)
+            var uniqueTestsCompleted = attemptsList
+                .GroupBy(ta => ta.TestId)
+                .Select(g => g.OrderByDescending(ta => ta.Percentage ?? 0).First())
+                .ToList();
+            int courseTestsCompleted = uniqueTestsCompleted.Count;
+
+            // Calculate average score for this course
+            var gradedAttempts = uniqueTestsCompleted.Where(ta => ta.Percentage.HasValue).ToList();
+            decimal courseAvgScore = gradedAttempts.Any() 
+                ? gradedAttempts.Average(ta => ta.Percentage!.Value) 
+                : 0;
+
+            courseProgressList.Add(new CourseProgressItemDto
+            {
+                CourseId = course.Id,
+                CourseTitle = course.Title,
+                MaterialsRead = courseMaterialsRead,
+                TotalMaterials = courseTotalMaterials,
+                MaterialsPercentage = courseTotalMaterials > 0 
+                    ? Math.Round((decimal)courseMaterialsRead / courseTotalMaterials * 100, 2) 
+                    : 0,
+                TestsCompleted = courseTestsCompleted,
+                TotalTests = courseTotalTests,
+                TestsPercentage = courseTotalTests > 0 
+                    ? Math.Round((decimal)courseTestsCompleted / courseTotalTests * 100, 2) 
+                    : 0,
+                AverageScore = courseAvgScore,
+                EnrolledAt = enrollment.CreatedAt
+            });
+
+            // Aggregate totals
+            totalMaterials += courseTotalMaterials;
+            completedMaterials += courseMaterialsRead;
+            totalTests += courseTotalTests;
+            completedTests += courseTestsCompleted;
+            
+            if (gradedAttempts.Any())
+            {
+                totalTestScore += gradedAttempts.Sum(ta => ta.Percentage!.Value);
+                gradedTestsCount += gradedAttempts.Count;
+            }
+        }
+
+        return new StudentProgressSummaryDto
+        {
+            TotalCoursesEnrolled = enrollmentsList.Count,
+            CompletedMaterials = completedMaterials,
+            TotalMaterials = totalMaterials,
+            MaterialsCompletionPercentage = totalMaterials > 0 
+                ? Math.Round((decimal)completedMaterials / totalMaterials * 100, 2) 
+                : 0,
+            CompletedTests = completedTests,
+            TotalTests = totalTests,
+            TestsCompletionPercentage = totalTests > 0 
+                ? Math.Round((decimal)completedTests / totalTests * 100, 2) 
+                : 0,
+            AverageTestScore = gradedTestsCount > 0 
+                ? Math.Round(totalTestScore / gradedTestsCount, 2) 
+                : 0,
+            CourseProgress = courseProgressList.OrderByDescending(cp => cp.EnrolledAt).ToList()
+        };
+    }
+
+    public async Task<CourseStudentProgressDto> GetCourseStudentProgressAsync(int teacherId, int courseId)
+    {
+        var teacher = await _unitOfWork.Users.GetByIdAsync(teacherId);
+        if (teacher == null || !teacher.CanTeach)
+        {
+            throw new UnauthorizedException("Only teachers can view course progress");
+        }
+
+        var course = await _unitOfWork.Courses.GetByIdAsync(courseId);
+        if (course == null || !course.IsActive)
+        {
+            throw new NotFoundException("Course not found");
+        }
+
+        if (course.TeacherId != teacherId)
+        {
+            throw new UnauthorizedException("You can only view progress for your own courses");
+        }
+
+        // Get all approved enrollments for this course
+        var enrollments = await _unitOfWork.Enrollments.FindAsync(
+            e => e.CourseId == courseId && e.Status == EnrollmentStatus.Approved);
+        var enrollmentsList = enrollments.ToList();
+
+        // Get all materials and tests for this course
+        var courseMaterials = await _unitOfWork.Materials.FindAsync(
+            m => m.CourseId == courseId && m.IsActive);
+        var materialsList = courseMaterials.ToList();
+        int totalMaterials = materialsList.Count;
+
+        var courseTests = await _unitOfWork.Tests.FindAsync(
+            t => t.CourseId == courseId && t.IsActive && t.Status == TestStatus.Published);
+        var testsList = courseTests.ToList();
+        int totalTests = testsList.Count;
+
+        var studentProgressList = new List<StudentProgressDetailDto>();
+
+        foreach (var enrollment in enrollmentsList)
+        {
+            var student = await _unitOfWork.Users.GetByIdAsync(enrollment.StudentId);
+            if (student == null) continue;
+
+            // Get materials read by this student
+            var materialsRead = await _unitOfWork.MaterialProgress.FindAsync(
+                mp => mp.StudentId == student.Id && mp.IsRead && 
+                      materialsList.Select(m => m.Id).Contains(mp.MaterialId));
+            int materialsReadCount = materialsRead.Count();
+            decimal materialsPercentage = totalMaterials > 0 
+                ? Math.Round((decimal)materialsReadCount / totalMaterials * 100, 2) 
+                : 0;
+
+            // Get test attempts for this student
+            var testAttempts = await _unitOfWork.TestAttempts.FindAsync(
+                ta => ta.StudentId == student.Id && 
+                      testsList.Select(t => t.Id).Contains(ta.TestId) &&
+                      (ta.Status == TestAttemptStatus.Submitted || ta.Status == TestAttemptStatus.Graded));
+            var attemptsList = testAttempts.ToList();
+
+            // Get unique tests completed (best attempt per test)
+            var uniqueTestsCompleted = attemptsList
+                .GroupBy(ta => ta.TestId)
+                .Select(g => g.OrderByDescending(ta => ta.Percentage ?? 0).First())
+                .ToList();
+            int testsCompletedCount = uniqueTestsCompleted.Count;
+            decimal testsPercentage = totalTests > 0 
+                ? Math.Round((decimal)testsCompletedCount / totalTests * 100, 2) 
+                : 0;
+
+            // Calculate average test score
+            var gradedAttempts = uniqueTestsCompleted.Where(ta => ta.Percentage.HasValue).ToList();
+            decimal avgScore = gradedAttempts.Any() 
+                ? Math.Round(gradedAttempts.Average(ta => ta.Percentage!.Value), 2) 
+                : 0;
+
+            // Determine status: struggling if avg score < 60 or completion < 50%
+            string status = "on-track";
+            if ((avgScore > 0 && avgScore < 60) || 
+                (materialsPercentage < 50 && totalMaterials > 0) || 
+                (testsPercentage < 50 && totalTests > 0))
+            {
+                status = "struggling";
+            }
+
+            studentProgressList.Add(new StudentProgressDetailDto
+            {
+                StudentId = student.Id,
+                StudentName = $"{student.FirstName} {student.LastName}",
+                GroupClass = student.GroupClass,
+                MaterialsReadCount = materialsReadCount,
+                TotalMaterials = totalMaterials,
+                MaterialsReadPercentage = materialsPercentage,
+                TestsCompletedCount = testsCompletedCount,
+                TotalTests = totalTests,
+                TestsCompletedPercentage = testsPercentage,
+                AverageTestScore = avgScore,
+                Status = status,
+                EnrolledAt = enrollment.CreatedAt
+            });
+        }
+
+        return new CourseStudentProgressDto
+        {
+            CourseId = course.Id,
+            CourseTitle = course.Title,
+            TotalStudents = enrollmentsList.Count,
+            StudentProgress = studentProgressList.OrderBy(sp => sp.Status == "struggling" ? 0 : 1)
+                                                  .ThenBy(sp => sp.AverageTestScore)
+                                                  .ToList()
+        };
+    }
 }
 
 

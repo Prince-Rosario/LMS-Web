@@ -64,12 +64,14 @@ public class CreateQuestionDto
 
 public class CreateAnswerOptionDto
 {
-    [Required]
-    [StringLength(1000, MinimumLength = 1)]
-    public string OptionText { get; set; } = string.Empty;
+    [StringLength(1000)]
+    public string? OptionText { get; set; }
     
     public bool IsCorrect { get; set; } = false;
     public int OrderIndex { get; set; }
 }
+
+
+
 
 

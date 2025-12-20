@@ -10,10 +10,12 @@ namespace Edify.BLL.Services;
 public class MaterialService : IMaterialService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService? _notificationService;
     
-    public MaterialService(IUnitOfWork unitOfWork)
+    public MaterialService(IUnitOfWork unitOfWork, INotificationService? notificationService = null)
     {
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
     
     public async Task<MaterialResponseDto> UploadMaterialAsync(int userId, UploadMaterialDto uploadDto)
@@ -50,6 +52,26 @@ public class MaterialService : IMaterialService
         
         await _unitOfWork.Materials.AddAsync(material);
         await _unitOfWork.SaveChangesAsync();
+        
+        // Send real-time notification to all enrolled students
+        if (_notificationService != null)
+        {
+            try
+            {
+                await _notificationService.NotifyMaterialPublishedAsync(
+                    material.CourseId,
+                    material.Id,
+                    material.Title,
+                    material.Type.ToString(),
+                    $"{user.FirstName} {user.LastName}",
+                    material.CreatedAt
+                );
+            }
+            catch
+            {
+                // Notification failure shouldn't break the upload
+            }
+        }
         
         return new MaterialResponseDto
         {

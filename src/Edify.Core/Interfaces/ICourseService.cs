@@ -13,6 +13,10 @@ public interface ICourseService
     Task<IEnumerable<CourseResponseDto>> GetAllUserCoursesAsync(int userId);
     Task<CourseResponseDto> GetCourseByIdAsync(int courseId, int userId);
     
+    // Progress tracking
+    Task<StudentProgressSummaryDto> GetStudentProgressAsync(int studentId);
+    Task<CourseStudentProgressDto> GetCourseStudentProgressAsync(int teacherId, int courseId);
+    
     // Admin methods
     Task<IEnumerable<CourseResponseDto>> GetPendingCoursesAsync(int adminId);
     Task ApproveCourseAsync(int adminId, ApproveCourseDto approveDto);

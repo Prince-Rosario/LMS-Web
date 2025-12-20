@@ -9,10 +9,12 @@ namespace Edify.BLL.Services;
 public class TestService : ITestService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService? _notificationService;
 
-    public TestService(IUnitOfWork unitOfWork)
+    public TestService(IUnitOfWork unitOfWork, INotificationService? notificationService = null)
     {
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     #region Test CRUD
@@ -60,11 +62,35 @@ public class TestService : ITestService
         for (int i = 0; i < createDto.Questions.Count; i++)
         {
             var questionDto = createDto.Questions[i];
+            var questionType = (QuestionType)questionDto.Type;
+            
+            // Validate that questions requiring answer options have them
+            if (questionType == QuestionType.MultipleChoice || 
+                questionType == QuestionType.TrueFalse || 
+                questionType == QuestionType.MultipleSelect)
+            {
+                if (questionDto.AnswerOptions == null || !questionDto.AnswerOptions.Any())
+                {
+                    throw new BadRequestException($"Question '{questionDto.QuestionText}' requires answer options");
+                }
+                
+                if (questionDto.AnswerOptions.Any(o => string.IsNullOrWhiteSpace(o.OptionText)))
+                {
+                    throw new BadRequestException($"All answer options for question '{questionDto.QuestionText}' must have text");
+                }
+                
+                // Validate that at least one option is marked as correct
+                if (!questionDto.AnswerOptions.Any(o => o.IsCorrect))
+                {
+                    throw new BadRequestException($"Question '{questionDto.QuestionText}' must have at least one correct answer");
+                }
+            }
+            
             var question = new Question
             {
                 QuestionText = questionDto.QuestionText,
                 Explanation = questionDto.Explanation,
-                Type = (QuestionType)questionDto.Type,
+                Type = questionType,
                 Points = questionDto.Points,
                 OrderIndex = questionDto.OrderIndex > 0 ? questionDto.OrderIndex : i + 1,
                 CorrectShortAnswer = questionDto.CorrectShortAnswer,
@@ -75,18 +101,24 @@ public class TestService : ITestService
             await _unitOfWork.Questions.AddAsync(question);
             await _unitOfWork.SaveChangesAsync();
 
-            // Add answer options
-            for (int j = 0; j < questionDto.AnswerOptions.Count; j++)
+            // Add answer options (only for question types that need them)
+            if (questionDto.AnswerOptions != null && questionDto.AnswerOptions.Any())
             {
-                var optionDto = questionDto.AnswerOptions[j];
-                var option = new AnswerOption
+                for (int j = 0; j < questionDto.AnswerOptions.Count; j++)
                 {
-                    OptionText = optionDto.OptionText,
-                    IsCorrect = optionDto.IsCorrect,
-                    OrderIndex = optionDto.OrderIndex > 0 ? optionDto.OrderIndex : j + 1,
-                    QuestionId = question.Id
-                };
-                await _unitOfWork.AnswerOptions.AddAsync(option);
+                    var optionDto = questionDto.AnswerOptions[j];
+                    if (!string.IsNullOrWhiteSpace(optionDto.OptionText))
+                    {
+                        var option = new AnswerOption
+                        {
+                            OptionText = optionDto.OptionText!,
+                            IsCorrect = optionDto.IsCorrect,
+                            OrderIndex = optionDto.OrderIndex > 0 ? optionDto.OrderIndex : j + 1,
+                            QuestionId = question.Id
+                        };
+                        await _unitOfWork.AnswerOptions.AddAsync(option);
+                    }
+                }
             }
         }
 
@@ -290,6 +322,24 @@ public class TestService : ITestService
         await _unitOfWork.Tests.UpdateAsync(test);
         await _unitOfWork.SaveChangesAsync();
 
+        // Send real-time notification to all enrolled students
+        if (_notificationService != null)
+        {
+            try
+            {
+                await _notificationService.NotifyTestPublishedAsync(
+                    test.CourseId,
+                    test.Id,
+                    test.Title,
+                    test.AvailableUntil
+                );
+            }
+            catch
+            {
+                // Notification failure shouldn't break the publish
+            }
+        }
+
         return await GetTestByIdAsync(testId, userId);
     }
 
@@ -345,14 +395,17 @@ public class TestService : ITestService
         for (int i = 0; i < questionDto.AnswerOptions.Count; i++)
         {
             var optionDto = questionDto.AnswerOptions[i];
-            var option = new AnswerOption
+            if (!string.IsNullOrWhiteSpace(optionDto.OptionText))
             {
-                OptionText = optionDto.OptionText,
-                IsCorrect = optionDto.IsCorrect,
-                OrderIndex = optionDto.OrderIndex > 0 ? optionDto.OrderIndex : i + 1,
-                QuestionId = question.Id
-            };
-            await _unitOfWork.AnswerOptions.AddAsync(option);
+                var option = new AnswerOption
+                {
+                    OptionText = optionDto.OptionText!,
+                    IsCorrect = optionDto.IsCorrect,
+                    OrderIndex = optionDto.OrderIndex > 0 ? optionDto.OrderIndex : i + 1,
+                    QuestionId = question.Id
+                };
+                await _unitOfWork.AnswerOptions.AddAsync(option);
+            }
         }
 
         await _unitOfWork.SaveChangesAsync();
@@ -814,10 +867,31 @@ public class TestService : ITestService
 
         attempt.Score = totalScore;
         attempt.MaxScore = maxScore;
-        attempt.Percentage = maxScore > 0 ? Math.Round((totalScore / maxScore) * 100, 2) : 0;
-
-        var test = await _unitOfWork.Tests.GetByIdAsync(attempt.TestId);
-        attempt.Passed = attempt.Percentage >= test!.PassingScore;
+        
+        // Check if there are any ungraded questions (essay questions)
+        var hasUngradedQuestions = false;
+        foreach (var answer in answers)
+        {
+            var question = await _unitOfWork.Questions.GetByIdAsync(answer.QuestionId);
+            if (question!.Type == QuestionType.Essay && answer.PointsEarned == null)
+            {
+                hasUngradedQuestions = true;
+                break;
+            }
+        }
+        
+        // Only calculate percentage and pass/fail if all questions are graded
+        if (hasUngradedQuestions)
+        {
+            attempt.Percentage = null;
+            attempt.Passed = null;
+        }
+        else
+        {
+            attempt.Percentage = maxScore > 0 ? Math.Round((totalScore / maxScore) * 100, 2) : 0;
+            var test = await _unitOfWork.Tests.GetByIdAsync(attempt.TestId);
+            attempt.Passed = attempt.Percentage >= test!.PassingScore;
+        }
     }
 
     public async Task<TestAttemptResponseDto> GetAttemptResultAsync(int attemptId, int userId)
@@ -999,6 +1073,28 @@ public class TestService : ITestService
 
         await _unitOfWork.TestAttempts.UpdateAsync(attempt);
         await _unitOfWork.SaveChangesAsync();
+
+        // Send real-time notification to the student
+        if (_notificationService != null)
+        {
+            try
+            {
+                await _notificationService.NotifyTestGradedAsync(
+                    attempt.StudentId,
+                    test.Id,
+                    test.Title,
+                    attempt.Id,
+                    attempt.Score,
+                    attempt.MaxScore,
+                    attempt.Percentage,
+                    attempt.Passed
+                );
+            }
+            catch
+            {
+                // Notification failure shouldn't break the grading
+            }
+        }
 
         return await GetAttemptResultAsync(attempt.Id, userId);
     }

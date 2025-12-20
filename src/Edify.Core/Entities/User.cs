@@ -12,6 +12,10 @@ public class User : BaseEntity
     public string? GroupClass { get; set; }
     public bool IsActive { get; set; } = true;
     
+    // Profile information
+    public string? ProfilePictureUrl { get; set; }
+    public string? PhoneNumber { get; set; }
+    
     // Multi-role support
     public bool CanTeach { get; set; } = false;
     public bool CanStudy { get; set; } = false;

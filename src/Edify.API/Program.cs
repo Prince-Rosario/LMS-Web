@@ -130,6 +130,8 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ITestService, TestService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
+builder.Services.AddScoped<INotificationService, Edify.API.Services.NotificationService>();
 
 var app = builder.Build();
 
@@ -167,8 +169,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Map SignalR Hub
+// Map SignalR Hubs
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
 

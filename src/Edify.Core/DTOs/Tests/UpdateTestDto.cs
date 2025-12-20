@@ -61,11 +61,14 @@ public class UpdateAnswerOptionDto
 {
     public int? Id { get; set; }
     
-    [StringLength(1000, MinimumLength = 1)]
+    [StringLength(1000)]
     public string? OptionText { get; set; }
     
     public bool? IsCorrect { get; set; }
     public int? OrderIndex { get; set; }
 }
+
+
+
 
 

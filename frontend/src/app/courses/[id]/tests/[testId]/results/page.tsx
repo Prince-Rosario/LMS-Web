@@ -256,8 +256,16 @@ export default function TestResultsPage() {
                           <p className="text-sm text-slate-500">{formatDate(attempt.submittedAt || attempt.startedAt)}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`text-lg font-bold ${attempt.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {(attempt.percentage ?? 0).toFixed(1)}%
+                          <p className={`text-lg font-bold ${
+                            attempt.percentage === null || attempt.percentage === undefined 
+                              ? 'text-amber-600' 
+                              : attempt.passed 
+                                ? 'text-emerald-600' 
+                                : 'text-rose-600'
+                          }`}>
+                            {attempt.percentage !== null && attempt.percentage !== undefined 
+                              ? `${attempt.percentage.toFixed(1)}%` 
+                              : 'Pending'}
                           </p>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${statusLabels[attempt.status]?.color}`}>
                             {statusLabels[attempt.status]?.label}
@@ -282,20 +290,50 @@ export default function TestResultsPage() {
                         <p className="text-slate-600">{selectedAttempt.studentName}</p>
                       )}
                     </div>
-                    <div className={`px-4 py-2 rounded-lg ${selectedAttempt.passed ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                      <span className={`text-2xl font-bold ${selectedAttempt.passed ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {selectedAttempt.passed ? 'PASSED' : 'FAILED'}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {selectedAttempt.status === 1 && isTeacher && (
+                        <button
+                          onClick={() => router.push(`/courses/${courseId}/tests/${testId}/grade/${selectedAttempt.id}`)}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Grade Test
+                        </button>
+                      )}
+                      {selectedAttempt.passed !== null && selectedAttempt.passed !== undefined && (
+                        <div className={`px-4 py-2 rounded-lg ${selectedAttempt.passed ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                          <span className={`text-2xl font-bold ${selectedAttempt.passed ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {selectedAttempt.passed ? 'PASSED' : 'FAILED'}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedAttempt.passed === null || selectedAttempt.passed === undefined) && selectedAttempt.status === 1 && (
+                        <div className="px-4 py-2 rounded-lg bg-amber-100">
+                          <span className="text-2xl font-bold text-amber-700">
+                            PENDING GRADING
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-4 gap-4">
                     <div className="text-center p-4 bg-slate-50 rounded-lg">
-                      <p className="text-3xl font-bold text-indigo-600">{(selectedAttempt.percentage ?? 0).toFixed(1)}%</p>
+                      <p className="text-3xl font-bold text-indigo-600">
+                        {selectedAttempt.percentage !== null && selectedAttempt.percentage !== undefined 
+                          ? `${selectedAttempt.percentage.toFixed(1)}%` 
+                          : '-'}
+                      </p>
                       <p className="text-sm text-slate-500">Score</p>
                     </div>
                     <div className="text-center p-4 bg-slate-50 rounded-lg">
-                      <p className="text-3xl font-bold text-slate-700">{selectedAttempt.score ?? 0}/{selectedAttempt.maxScore ?? 0}</p>
+                      <p className="text-3xl font-bold text-slate-700">
+                        {selectedAttempt.score !== null && selectedAttempt.score !== undefined 
+                          ? `${selectedAttempt.score}/${selectedAttempt.maxScore ?? 0}` 
+                          : '-'}
+                      </p>
                       <p className="text-sm text-slate-500">Points</p>
                     </div>
                     <div className="text-center p-4 bg-slate-50 rounded-lg">

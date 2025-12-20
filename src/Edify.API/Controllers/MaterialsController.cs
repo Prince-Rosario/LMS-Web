@@ -24,14 +24,6 @@ public class MaterialsController : ControllerBase
         return int.Parse(userIdClaim ?? "0");
     }
     
-    [HttpPost]
-    public async Task<ActionResult<MaterialResponseDto>> UploadMaterial([FromBody] UploadMaterialDto uploadDto)
-    {
-        var userId = GetUserId();
-        var response = await _materialService.UploadMaterialAsync(userId, uploadDto);
-        return Ok(response);
-    }
-    
     /// <summary>
     /// Upload a file as Base64 (images, PDFs, documents up to 5MB)
     /// </summary>
@@ -165,14 +157,6 @@ public class MaterialsController : ControllerBase
         var userId = GetUserId();
         await _materialService.MarkAsReadAsync(userId, markAsReadDto);
         return Ok(new { message = "Material marked as read" });
-    }
-    
-    [HttpGet("my-materials")]
-    public async Task<ActionResult<IEnumerable<MaterialResponseDto>>> GetMyMaterials([FromQuery] int? courseId = null)
-    {
-        var userId = GetUserId();
-        var materials = await _materialService.GetMyMaterialsAsync(userId, courseId);
-        return Ok(materials);
     }
 }
 
