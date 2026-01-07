@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 type UserData = {
     userId: number;
@@ -119,22 +120,48 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <div className="flex flex-col items-end">
-                                <p className="text-sm font-medium text-slate-900">
-                                    {user.firstName} {user.lastName}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    {user.canTeach && user.canStudy ? (
-                                        <>Teacher & Student</>
-                                    ) : user.canTeach ? (
-                                        <>Teacher</>
-                                    ) : (
-                                        <>Student</>
-                                    )}
-                                    {user.groupClass && ` • ${user.groupClass}`}
-                                </p>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            {/* Progress Link (Students) */}
+                            {user.canStudy && (
+                                <button
+                                    onClick={() => router.push('/progress')}
+                                    className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                                    title="My Progress"
+                                >
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </button>
+                            )}
+
+                            {/* Notification Bell */}
+                            <NotificationBell />
+
+                            {/* Profile Link */}
+                            <button
+                                onClick={() => router.push('/profile')}
+                                className="flex items-center gap-3 rounded-lg px-3 py-1.5 transition-colors hover:bg-slate-100"
+                            >
+                                <div className="flex flex-col items-end">
+                                    <p className="text-sm font-medium text-slate-900">
+                                        {user.firstName} {user.lastName}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {user.canTeach && user.canStudy ? (
+                                            <>Teacher & Student</>
+                                        ) : user.canTeach ? (
+                                            <>Teacher</>
+                                        ) : (
+                                            <>Student</>
+                                        )}
+                                        {user.groupClass && ` • ${user.groupClass}`}
+                                    </p>
+                                </div>
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                                    {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                                </div>
+                            </button>
+
                             <button
                                 onClick={handleLogout}
                                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 hover:border-slate-300"

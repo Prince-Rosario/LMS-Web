@@ -17,11 +17,9 @@ public class UpdateProfileDto
     [StringLength(100)]
     public string Email { get; set; } = string.Empty;
     
-    [Url]
     [StringLength(500)]
     public string? ProfilePictureUrl { get; set; }
     
-    [Phone]
     [StringLength(20)]
     public string? PhoneNumber { get; set; }
 }

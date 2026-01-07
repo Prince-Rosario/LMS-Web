@@ -63,6 +63,16 @@ const statusLabels: Record<number, { label: string; color: string }> = {
   3: { label: 'Expired', color: 'bg-rose-100 text-rose-700' },
 };
 
+interface TestStatistics {
+  totalAttempts: number;
+  gradedAttempts: number;
+  pendingGrading: number;
+  passRate: number;
+  averageScore: number;
+  highestScore: number;
+  lowestScore: number;
+}
+
 const questionTypeLabels: Record<number, string> = {
   0: 'Multiple Choice',
   1: 'Multiple Select',
@@ -193,6 +203,28 @@ export default function TestResultsPage() {
 
   const attempts = isTeacher ? allStudentAttempts : results?.attempts || [];
 
+  // Calculate statistics for teachers
+  const calculateStatistics = (): TestStatistics | null => {
+    if (!isTeacher || allStudentAttempts.length === 0) return null;
+    
+    const gradedAttempts = allStudentAttempts.filter(a => a.status === 2);
+    const pendingAttempts = allStudentAttempts.filter(a => a.status === 1);
+    const passedAttempts = gradedAttempts.filter(a => a.passed === true);
+    const scores = gradedAttempts.filter(a => a.percentage !== null && a.percentage !== undefined).map(a => a.percentage!);
+    
+    return {
+      totalAttempts: allStudentAttempts.length,
+      gradedAttempts: gradedAttempts.length,
+      pendingGrading: pendingAttempts.length,
+      passRate: gradedAttempts.length > 0 ? (passedAttempts.length / gradedAttempts.length) * 100 : 0,
+      averageScore: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+      highestScore: scores.length > 0 ? Math.max(...scores) : 0,
+      lowestScore: scores.length > 0 ? Math.min(...scores) : 0,
+    };
+  };
+
+  const stats = calculateStatistics();
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -219,6 +251,78 @@ export default function TestResultsPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
+        {/* Statistics Cards for Teachers */}
+        {isTeacher && stats && (
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+                  <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-slate-900">{stats.totalAttempts}</p>
+                  <p className="text-xs text-slate-500">Total Submissions</p>
+                </div>
+              </div>
+              {stats.pendingGrading > 0 && (
+                <p className="mt-2 text-xs text-amber-600 font-medium">
+                  {stats.pendingGrading} pending grading
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+                  <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className={`text-xl font-bold ${stats.passRate >= 70 ? 'text-emerald-600' : stats.passRate >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                    {stats.passRate.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-slate-500">Pass Rate</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100">
+                  <svg className="h-5 w-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-slate-900">{stats.averageScore.toFixed(1)}%</p>
+                  <p className="text-xs text-slate-500">Average Score</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                  <svg className="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-emerald-600">{stats.highestScore.toFixed(1)}%</span>
+                    <span className="text-slate-400">/</span>
+                    <span className="text-sm font-semibold text-rose-600">{stats.lowestScore.toFixed(1)}%</span>
+                  </div>
+                  <p className="text-xs text-slate-500">High / Low Score</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {attempts.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white py-16">
             <svg className="mb-4 h-16 w-16 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
